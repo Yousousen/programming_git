@@ -1,8 +1,8 @@
+ipython
+numpy
 pandas
 matplotlib
 torch
-ray[tune]
-scikit-learn
-scikit-optimize
-ipython
-numpy==1.19.5
+#ray[tune]
+#scikit-learn
+#scikit-optimize

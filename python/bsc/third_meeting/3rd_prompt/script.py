@@ -3,7 +3,7 @@
 
 # # Experimenting to optimize for h
 
-# In[35]:
+# In[36]:
 
 
 # Import the necessary modules
@@ -44,7 +44,7 @@ def h(x1, x2, x3):
     return x3 * x1**(x2)
 
 
-# In[36]:
+# In[37]:
 
 
 # Define the range and step size for the input variables
@@ -80,7 +80,7 @@ Y_g_train, Y_g_test = torch.utils.data.random_split(Y_g, [train_size, test_size]
 Y_h_train, Y_h_test = torch.utils.data.random_split(Y_h, [train_size, test_size])
 
 
-# In[37]:
+# In[38]:
 
 
 # Let us have a variable number of hidden layers.
@@ -107,7 +107,8 @@ def create_network(input_size, output_size, hidden_sizes, activations, output_ac
     return model
 
 
-# In[38]:
+
+# In[39]:
 
 
 # Define a function to train a neural network with given hyperparameters and data
@@ -165,7 +166,7 @@ def train_network(model, optimizer, loss_fn, batch_size, epochs,
         return train_losses
 
 
-# In[39]:
+# In[40]:
 
 
 # Define a function to plot the losses during training
@@ -188,7 +189,7 @@ def plot_losses(train_losses, test_losses=None, function_name=None, hyperparamet
     plt.show()
 
 
-# In[40]:
+# In[41]:
 
 
 # Define a function to plot the predictions versus the true values
@@ -211,7 +212,7 @@ def plot_predictions(model, X, Y_true, function_name, hyperparameters=""):
     plt.show()
 
 
-# In[41]:
+# In[42]:
 
 
 # Define a list of functions to be approximated
@@ -225,11 +226,15 @@ outputs_train = [Y_f_train, Y_g_train, Y_h_train]
 outputs_test = [Y_f_test, Y_g_test, Y_h_test]
 
 
-# In[42]:
+# In[43]:
 
 
-get_ipython().run_cell_magic('script', 'echo skipping', '\n# Loop over each function to be approximated\nfor i in range(len(functions)):\n    # Print the function name\n    print(f"Approximating function {function_names[i]}")\n    # Create a neural network with given hyperparameters\n    input_size = 3 # The number of input variables (x1, x2, x3)\n    output_size = 1 # The number of output variables (y)\n    # Create a network with 3 hidden layers and ReLU activations, and an optional output activation\n    hidden_sizes = [64, 128, 256, 512]\n    activations = [nn.ELU, nn.ELU, nn.ELU, nn.ELU]\n\n\n    output_activation = None\n    model = create_network(input_size, output_size,\n                        hidden_sizes, activations, output_activation=output_activation)\n\n    # Create an instance of VariableNetwork by passing the model\n    network = VariableNetwork(model)\n\n    # Create an optimizer with given hyperparameters\n    optimizer = optim.Adam(network.parameters(), lr=0.001)\n\n    # Create a loss function with given hyperparameters\n    loss_fn = nn.MSELoss()\n    # Train the network with given hyperparameters and data\n    batch_size = 64 # The number of samples in each batch\n    epochs = 100 # The number of times to loop over the whole dataset\n    # Create a string representation of the hyperparameters\n    hyperparameters_str = f"hidden_sizes_{hidden_sizes}_activations_{[act.__name__ for act in activations]}_optimizer_{optimizer.__class__.__name__}_lr_{optimizer.param_groups[0][\'lr\']}_batch_size_{batch_size}_epochs_{epochs}"\n    if output_activation:\n        hyperparameters_str += f"_output_activation_{output_activation.__name__}"\n\n    if output_activation:\n        hyperparameters_str += f"_output_activation_{output_activation.__name__}"\n\n    train_losses, test_losses = train_network(network, optimizer, loss_fn,\n                                            batch_size, epochs,\n                                            X_train.dataset, outputs_train[i].dataset,\n                                            X_test.dataset, outputs_test[i].dataset)\n    plot_losses(train_losses, test_losses, function_names[i], hyperparameters=hyperparameters_str)\n    plot_predictions(network, X, outputs[i], function_names[i], hyperparameters=hyperparameters_str)\n\n    # Save the network with hyperparameters in the file name\n    torch.save(network, f"network_{function_names[i]}_{hyperparameters_str}.pt")')
+get_ipython().run_cell_magic('script', 'echo skipping', '\n# Loop over each function to be approximated\nfor i in range(len(functions)):\n    # Print the function name\n    print(f"Approximating function {function_names[i]}")\n    # Create a neural network with given hyperparameters\n    input_size = 3 # The number of input variables (x1, x2, x3)\n    output_size = 1 # The number of output variables (y)\n    # Create a network with 3 hidden layers and ReLU activations, and an optional output activation\n    hidden_sizes = [64, 128, 256, 512]\n    activations = [nn.ELU, nn.ELU, nn.ELU, nn.ELU]\n\n\n    output_activation = None\n    model = create_network(input_size, output_size,\n                        hidden_sizes, activations, output_activation=output_activation)\n\n    # Create an instance of VariableNetwork by passing the model\n    network = VariableNetwork(model)\n\n    # Create an optimizer with given hyperparameters\n    optimizer = optim.Adam(network.parameters(), lr=0.001)\n\n    # Create a loss function with given hyperparameters\n    loss_fn = nn.MSELoss()\n    # Train the network with given hyperparameters and data\n    batch_size = 64 # The number of samples in each batch\n    epochs = 100 # The number of times to loop over the whole dataset\n    # Create a string representation of the hyperparameters\n    hyperparameters_str = f"hidden_sizes_{hidden_sizes}_activations_{[act.__name__ for act in activations]}_optimizer_{optimizer.__class__.__name__}_lr_{optimizer.param_groups[0][\'lr\']}_batch_size_{batch_size}_epochs_{epochs}"\n    if output_activation:\n        hyperparameters_str += f"_output_activation_{output_activation.__name__}"\n\n    if output_activation:\n        hyperparameters_str += f"_output_activation_{output_activation.__name__}"\n\n    train_losses, test_losses = train_network(network, optimizer, loss_fn,\n                                            batch_size, epochs,\n                                            X_train.dataset, outputs_train[i].dataset,\n                                            X_test.dataset, outputs_test[i].dataset)\n    plot_losses(train_losses, test_losses, function_names[i], hyperparameters=hyperparameters_str)\n    plot_predictions(network, X, outputs[i], function_names[i], hyperparameters=hyperparameters_str)\n\n    # Save the network with hyperparameters in the file name\n    torch.save(network, f"network_{function_names[i]}_{hyperparameters_str}.pt")\n')
 
+
+# # Convert notebook to python script
+# 
+# Running the cell converts this whole notebook to a python script.
 
 # # Ray Tune
 
@@ -300,13 +305,14 @@ def tune_network(config):
 from skopt.space import Real, Integer, Categorical
 
 # Define the search space for SkOpt
+# This tries just one hidden layer.
 search_space = {
     "hidden_sizes": Integer(32, 1024),
     "activation_classes": Categorical(["ReLU", "ELU", "LeakyReLU", "Tanh", "Sigmoid"]),
     "output_activation_class": Categorical([None, "ReLU", "ELU", "LeakyReLU", "Tanh", "Sigmoid"]),
     "lr": Real(1e-4, 1e-2, "log-uniform"),
     "batch_size": Integer(32, 256),
-    "epochs": Integer(10, 200),
+    "epochs": Integer(10, 50),
 }
 
 # Initialize SkOpt search algorithm
