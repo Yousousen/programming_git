@@ -1,0 +1,8 @@
+numpy==1.19.2 # I need to downgrade numpy because scikit-optimize uses the depcrecated np.int.
+pandas
+matplotlib
+torch
+ray[tune]
+scikit-learn
+scikit-optimize
+ipython
