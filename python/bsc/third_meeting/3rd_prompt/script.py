@@ -77,7 +77,7 @@ Y_h_train, Y_h_test = torch.utils.data.random_split(Y_h, [train_size, test_size]
 
 # Let us have a variable number of hidden layers.
 # Define a function to create a neural network with given hyperparameters
-def create_network(input_size, output_size, hidden_sizes, activations, output_activation=None):
+def create_network(input_size, output_size, hidden_sizes, activations):
     # Create a ModuleList to hold the layers
     model = nn.ModuleList()
     # Loop over the hidden sizes and activations
@@ -90,12 +90,8 @@ def create_network(input_size, output_size, hidden_sizes, activations, output_ac
         input_size = hidden_size
     # Add the final output layer with the output size
     model.append(nn.Linear(input_size, output_size))
-    # If output activation is given, add it as another layer
-    if output_activation is not None:
-        model.append(output_activation())
     # Return the model
     return model
-
 
 
 
