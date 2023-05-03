@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Approximating h
+# # Approximating f
 # 
-# We use Optuna to do a type of Bayesian optimization of the hyperparameters of the model. We then train the model using these hyperparameters to approximate the function $h = x_3 \cdot x_1^{x_2}$
+# We use Optuna to do a type of Bayesian optimization of the hyperparameters of the model. We then train the model using these hyperparameters to approximate the function $f$ that we define in this notebook.
 
 # Use this first cell to convert the notebook to a python script.
 
-# In[ ]:
+# In[2]:
 
 
 # Importing the necessary libraries
@@ -20,7 +20,7 @@ import tensorboardX as tbx
 import matplotlib.pyplot as plt
 
 
-# In[ ]:
+# In[3]:
 
 
 # Defining the function to approximate
@@ -55,7 +55,7 @@ x_train, x_test = torch.split(x, [train_size, test_size])
 y_train, y_test = torch.split(y, [train_size, test_size])
 
 
-# In[ ]:
+# In[4]:
 
 
 # Defining a custom neural network class
@@ -99,7 +99,7 @@ class Net(nn.Module):
 
 # ## Setting the search space
 
-# In[ ]:
+# In[5]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -122,7 +122,7 @@ def create_model(trial):
     # Sampling the hyperparameters from the search space
     n_layers = trial.suggest_int("n_layers", 1, 2)
     n_units = trial.suggest_int("n_units", 2, 32)
-    hidden_activation_name = trial.suggest_categorical("hidden_activation", ["ReLU"])
+    hidden_activation_name = trial.suggest_categorical("hidden_activation", ["None","ReLU"])
     output_activation_name = trial.suggest_categorical("output_activation", ["ReLU", "Tanh", "Sigmoid"])
     loss_name = trial.suggest_categorical("loss", ["MSE", "MAE"])
     optimizer_name = trial.suggest_categorical("optimizer", ["SGD", "Adam"])
@@ -179,7 +179,7 @@ def create_model(trial):
 
 # ## The train and eval loop
 
-# In[ ]:
+# In[6]:
 
 
 # Defining a function to train and evaluate a network
@@ -273,7 +273,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
     return train_losses, test_losses, train_accuracies, test_accuracies
 
 
-# In[ ]:
+# In[7]:
 
 
 # Defining a function to compute the objective value for a trial
@@ -298,7 +298,7 @@ def objective(trial):
 
 # ## Finding the best hyperparameters with Optuna
 
-# In[ ]:
+# In[8]:
 
 
 # Creating a study object with Optuna
@@ -310,7 +310,7 @@ study.optimize(objective, n_trials=100)
 
 # ## Training with the best parameters
 
-# In[ ]:
+# In[9]:
 
 
 # Printing the best parameters and the best value
@@ -329,7 +329,7 @@ torch.save(best_net.state_dict(), "best_net.pth")
 
 # ## Visualizing results
 
-# In[ ]:
+# In[12]:
 
 
 # Creating a tensorboard writer
@@ -353,6 +353,7 @@ plt.xlabel("True Values")
 plt.ylabel("Predicted Values")
 plt.title("Predicted Values vs True Values")
 plt.savefig("pred_vs_true.png")
+plt.figure()
 
 # Plotting the bias (difference between predicted values and true values) for a random sample of 1000 test points
 bias = y_pred - y_sample.numpy()
@@ -361,4 +362,140 @@ plt.xlabel("Bias")
 plt.ylabel("Frequency")
 plt.title("Bias Distribution")
 plt.savefig("bias_dist.png")
+
+
+# ## Saving data
+
+# ### Pickle
+
+# In[13]:
+
+
+import pickle
+
+# Save the objects to a file
+with open("best_objects.pkl", "wb") as f:
+    pickle.dump(best_net, f)
+    pickle.dump(best_loss_fn, f)
+    pickle.dump(best_optimizer, f)
+    pickle.dump(best_batch_size, f)
+    pickle.dump(best_n_epochs, f)
+    pickle.dump(best_scheduler, f)
+    pickle.dump(best_train_losses, f)
+    pickle.dump(best_test_losses, f)
+    pickle.dump(best_train_accuracies, f)
+    pickle.dump(best_test_accuracies, f)
+
+
+# ### Pandas
+
+# Pandas is not suitable for saving complex objects like PyTorch models, loss functions, optimizers, or schedulers. Pandas is mainly used for saving tabular data, such as lists of numbers or strings. If you want to save these objects for later analysis, you may want to use pickle or torch.save instead. However, if you only want to save the hyperparameters and the metrics, you can use pandas.DataFrame to create a data frame with one row and multiple columns. You can then use pandas.to_csv to write the data frame to a CSV file. For example, you could use the following code:
+# 
+
+# In[16]:
+
+
+import pandas as pd
+
+# Get the names of the loss function, optimizer, and scheduler
+loss_name = type(best_loss_fn).__name__
+optimizer_name = type(best_optimizer).__name__
+scheduler_name = type(best_scheduler).__name__ if best_scheduler else "None"
+
+# Create a data frame with one row and multiple columns
+data = pd.DataFrame({
+    "hidden_activation": [best_net.hidden_activation.__class__.__name__],
+    "output_activation": [best_net.output_activation.__class__.__name__],
+    "loss": [loss_name],
+    "optimizer": [optimizer_name],
+    "lr": [best_optimizer.param_groups[0]["lr"]],
+    "batch_size": [best_batch_size],
+    "n_epochs": [best_n_epochs],
+    "scheduler": [scheduler_name],
+    "train_loss": [best_train_losses[-1]],
+    "test_loss": [best_test_losses[-1]],
+    "train_accuracy": [best_train_accuracies[-1]],
+    "test_accuracy": [best_test_accuracies[-1]]
+})
+
+# Save the data frame to a CSV file
+data.to_csv("best_data.csv", index=False)
+
+
+# ### JSON to store study values 
+
+# In[17]:
+
+
+import json
+
+# Save the values to a file
+with open("best_values.json", "w") as f:
+    json.dump({"params": study.best_params, "value": study.best_value}, f)
+
+# Load the values from the file
+with open("best_values.json", "r") as f:
+    best_values = json.load(f)
+
+
+# ## Loading data
+
+# ### Pickle
+
+# In[ ]:
+
+
+import pickle
+
+# Load the objects from the file
+with open("best_objects.pkl", "rb") as f:
+    best_net = pickle.load(f)
+    best_loss_fn = pickle.load(f)
+    best_optimizer = pickle.load(f)
+    best_batch_size = pickle.load(f)
+    best_n_epochs = pickle.load(f)
+    best_scheduler = pickle.load(f)
+    best_train_losses = pickle.load(f)
+    best_test_losses = pickle.load(f)
+    best_train_accuracies = pickle.load(f)
+    best_test_accuracies = pickle.load(f)
+
+
+# ### Loading the model
+# 
+# To load your saved best_net.pth, you need to create an instance of the same model class first, and then load the state dictionary using the torch.load and load_state_dict methods. For example, you could use the following code:
+
+# In[19]:
+
+
+import json
+
+# Load the values from the file
+with open("best_values.json", "r") as f:
+    best_values = json.load(f)
+
+# Get the number of layers, the number of units, the hidden activation and the output activation
+n_layers = best_values["params"]["n_layers"]
+n_units = best_values["params"]["n_units"]
+hidden_activation = best_values["params"]["hidden_activation"]
+output_activation = best_values["params"]["output_activation"]
+
+# Print the values
+print("Number of layers:", n_layers)
+print("Number of units:", n_units)
+print("Hidden activation:", hidden_activation)
+print("Output activation:", output_activation)
+
+
+# In[ ]:
+
+
+# Create an instance of the same model class
+model = Net(n_layers, n_units, hidden_activation, output_activation)
+
+# Load the state dictionary from the file
+model.load_state_dict(torch.load("best_net.pth"))
+
+# Set the model to evaluation mode
+model.eval()
 
