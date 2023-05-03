@@ -1,0 +1,1 @@
+{"params": {"n_layers": 1, "n_units": 6, "hidden_activation": "ReLU", "output_activation": "ReLU", "loss": "MAE", "optimizer": "Adam", "lr": 0.0006109876777210102, "batch_size": 70, "n_epochs": 16}, "value": 4.038462010264396}

@@ -1,0 +1,2 @@
+hidden_activation,output_activation,loss,optimizer,lr,batch_size,n_epochs,scheduler,train_loss,test_loss,train_accuracy,test_accuracy
+ReLU,ReLU,L1Loss,Adam,0.0006109876777210102,70,16,None,4.068592907905579,4.038331070780754,tensor(0.1743),tensor(0.2488)
