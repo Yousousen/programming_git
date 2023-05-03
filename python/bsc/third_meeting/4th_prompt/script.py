@@ -38,10 +38,17 @@ def h(x1, x2, x3):
     return x3 * x1 ** x2
 
 # Generating the data samples
+nsamples = 10**5
+
+x1min = x3min = -10
+x1max = x3max = 10
+x2min = 0
+x2max = 5
+
 np.random.seed(0)
-x1 = np.random.uniform(0, 10, size=10**6)
-x2 = np.random.uniform(0, 10, size=10**6)
-x3 = np.random.uniform(0, 10, size=10**6)
+x1 = np.random.uniform(x1min, x1max, size=nsamples)
+x2 = np.random.uniform(x2min, x2max, size=nsamples)
+x3 = np.random.uniform(x3min, x3max, size=nsamples)
 y = h(x1, x2, x3)
 
 # Converting the data to tensors
@@ -121,16 +128,17 @@ def create_model(trial):
             n_epochs is the number of epochs,
             scheduler is the learning rate scheduler.
     """
+
     # Sampling the hyperparameters from the search space
-    n_layers = 2 #trial.suggest_int("n_layers", 1, 3)
-    n_units = 32 #trial.suggest_int("n_units", 32, 128)
-    hidden_activation_name = "ReLU" # trial.suggest_categorical("hidden_activation", ["ReLU", "Tanh", "Sigmoid"])
-    output_activation_name = "ReLU" # trial.suggest_categorical("output_activation", ["ReLU", "Tanh", "Sigmoid"])
-    loss_name = trial.suggest_categorical("loss", ["MSE"])#, "MAE", "Huber"])
-    optimizer_name = "SGD" # trial.suggest_categorical("optimizer", ["SGD", "Adam", "RMSprop"])
-    lr = 1e-3 #trial.suggest_loguniform("lr", 1e-5, 1e-1)
-    batch_size = 256 #trial.suggest_int("batch_size", 32, 512)
-    n_epochs = 10 # trial.suggest_int("n_epochs", 10, 100)
+    n_layers = trial.suggest_int("n_layers", 1, 3)
+    n_units = trial.suggest_int("n_units", 32, 128)
+    hidden_activation_name = trial.suggest_categorical("hidden_activation", ["ReLU", "Sigmoid"])
+    output_activation_name = trial.suggest_categorical("output_activation", ["ReLU", "Sigmoid"])
+    loss_name = trial.suggest_categorical("loss", ["MSE", "MAE"])
+    optimizer_name =  trial.suggest_categorical("optimizer", ["SGD", "Adam"])
+    lr = trial.suggest_loguniform("lr", 1e-4, 1e-2)
+    batch_size = trial.suggest_int("batch_size", 64, 256)
+    n_epochs = trial.suggest_int("n_epochs", 10, 100)
     scheduler_name = None # trial.suggest_categorical("scheduler", ["None", "StepLR", "ExponentialLR"])
 
     # Creating the activation functions from their names
