@@ -24,32 +24,20 @@ import matplotlib.pyplot as plt
 
 
 # Defining the function to approximate
-def h(x1, x2, x3):
-    """Returns the value of the function h(x1, x2, x3) = x3 * x1 ** x2.
-
-    Args:
-        x1 (float or array-like): The first input.
-        x2 (float or array-like): The second input.
-        x3 (float or array-like): The third input.
-
-    Returns:
-        float or array-like: The value of the function h at the given inputs.
-    """
-    return x3 * x1 ** x2
+def f(x1, x2, x3):
+    return x1 + x2 + x3
 
 # Generating the data samples
 nsamples = 10**5
 
-x1min = x3min = -10
-x1max = x3max = 10
-x2min = 0
-x2max = 5
+x1min = x2min = x3min = -10
+x1max = x2max = x3max = 10
 
 np.random.seed(0)
 x1 = np.random.uniform(x1min, x1max, size=nsamples)
 x2 = np.random.uniform(x2min, x2max, size=nsamples)
 x3 = np.random.uniform(x3min, x3max, size=nsamples)
-y = h(x1, x2, x3)
+y = f(x1, x2, x3)
 
 # Converting the data to tensors
 x1 = torch.from_numpy(x1).float()
@@ -109,6 +97,8 @@ class Net(nn.Module):
         return x
 
 
+# ## Setting the search space
+
 # In[ ]:
 
 
@@ -130,16 +120,16 @@ def create_model(trial):
     """
 
     # Sampling the hyperparameters from the search space
-    n_layers = trial.suggest_int("n_layers", 1, 3)
-    n_units = trial.suggest_int("n_units", 32, 128)
-    hidden_activation_name = trial.suggest_categorical("hidden_activation", ["ReLU", "Sigmoid"])
-    output_activation_name = trial.suggest_categorical("output_activation", ["ReLU", "Sigmoid"])
+    n_layers = trial.suggest_int("n_layers", 1, 2)
+    n_units = trial.suggest_int("n_units", 2, 32)
+    hidden_activation_name = trial.suggest_categorical("hidden_activation", ["ReLU"])
+    output_activation_name = trial.suggest_categorical("output_activation", ["ReLU", "Tanh", "Sigmoid"])
     loss_name = trial.suggest_categorical("loss", ["MSE", "MAE"])
-    optimizer_name =  trial.suggest_categorical("optimizer", ["SGD", "Adam"])
-    lr = trial.suggest_loguniform("lr", 1e-4, 1e-2)
-    batch_size = trial.suggest_int("batch_size", 64, 256)
-    n_epochs = trial.suggest_int("n_epochs", 10, 100)
-    scheduler_name = None # trial.suggest_categorical("scheduler", ["None", "StepLR", "ExponentialLR"])
+    optimizer_name = trial.suggest_categorical("optimizer", ["SGD", "Adam"])
+    lr = trial.suggest_loguniform("lr", 1e-5, 1e-1)
+    batch_size = trial.suggest_int("batch_size", 32, 512)
+    n_epochs = trial.suggest_int("n_epochs", 10, 20)
+    scheduler_name = "None"
 
     # Creating the activation functions from their names
     if hidden_activation_name == "ReLU":
@@ -186,6 +176,8 @@ def create_model(trial):
     # Returning the network, the loss function, the optimizer, the batch size, the number of epochs and the scheduler
     return net, loss_fn, optimizer, batch_size, n_epochs, scheduler
 
+
+# ## The train and eval loop
 
 # In[ ]:
 
