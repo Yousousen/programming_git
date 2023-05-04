@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Approximating f
+# # Neural network to learn a function f
 # 
 # We use Optuna to do a type of Bayesian optimization of the hyperparameters of the model. We then train the model using these hyperparameters to approximate the function $f$ that we define in this notebook.
 
@@ -10,78 +10,78 @@
 # In[2]:
 
 
-# Importing the necessary libraries
+# Importing the libraries
+import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
 import optuna
 import tensorboardX as tbx
-import matplotlib.pyplot as plt
 
 
-# In[3]:
+# In[14]:
 
 
-# Defining the function to approximate
-def f(x1, x2, x3):
-    return x1 + x2 + x3
+get_ipython().run_cell_magic('script', 'echo skipping', '# Defining the function to approximate\ndef f(x1, x2, x3):\n    return x1 + x2 + x3\n\n# Generating the data samples\nnsamples = 10**5\n\nx1min = x2min = x3min = -10\nx1max = x2max = x3max = 10\n\nnp.random.seed(0)\nx1 = np.random.uniform(x1min, x1max, size=nsamples)\nx2 = np.random.uniform(x2min, x2max, size=nsamples)\nx3 = np.random.uniform(x3min, x3max, size=nsamples)\ny = f(x1, x2, x3)\n\n# Converting the data to tensors\nx1 = torch.from_numpy(x1).float()\nx2 = torch.from_numpy(x2).float()\nx3 = torch.from_numpy(x3).float()\ny = torch.from_numpy(y).float()\n\n# Stacking the inputs into a single tensor\nx = torch.stack([x1, x2, x3], dim=1)\n\n# Splitting the data into train and test sets\ntrain_size = int(0.8 * len(x))\ntest_size = len(x) - train_size\nx_train, x_test = torch.split(x, [train_size, test_size])\ny_train, y_test = torch.split(y, [train_size, test_size])\n')
 
-# Generating the data samples
-nsamples = 10**5
 
-x1min = x2min = x3min = -10
-x1max = x2max = x3max = 10
+# In[15]:
 
+
+# Checking if GPU is available and setting the device accordingly
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Generating the data
 np.random.seed(0)
-x1 = np.random.uniform(x1min, x1max, size=nsamples)
-x2 = np.random.uniform(x2min, x2max, size=nsamples)
-x3 = np.random.uniform(x3min, x3max, size=nsamples)
-y = f(x1, x2, x3)
-
-# Converting the data to tensors
-x1 = torch.from_numpy(x1).float()
-x2 = torch.from_numpy(x2).float()
-x3 = torch.from_numpy(x3).float()
-y = torch.from_numpy(y).float()
-
-# Stacking the inputs into a single tensor
-x = torch.stack([x1, x2, x3], dim=1)
+x = np.random.uniform(-10, 10, size=(10000, 3))
+y = 2 * x[:, 0] - 3 * x[:, 1] + 5 * x[:, 2] + np.random.normal(0, 1, size=10000)
 
 # Splitting the data into train and test sets
-train_size = int(0.8 * len(x))
-test_size = len(x) - train_size
-x_train, x_test = torch.split(x, [train_size, test_size])
-y_train, y_test = torch.split(y, [train_size, test_size])
+x_train = torch.tensor(x[:8000], dtype=torch.float32).to(device) # Added moving the tensor to the device
+y_train = torch.tensor(y[:8000], dtype=torch.float32).to(device) # Added moving the tensor to the device
+x_test = torch.tensor(x[8000:], dtype=torch.float32).to(device) # Added moving the tensor to the device
+y_test = torch.tensor(y[8000:], dtype=torch.float32).to(device) # Added moving the tensor to the device
 
 
-# In[4]:
+# In[16]:
 
 
-# Defining a custom neural network class
+# Defining a class for the network
 class Net(nn.Module):
-    """A custom neural network class that approximates the function h.
+    """A class for creating a network with a variable number of hidden layers and units.
 
-    Args:
+    Attributes:
         n_layers (int): The number of hidden layers in the network.
-        n_units (int): The number of hidden units in each layer.
+        n_units (list): A list of integers representing the number of units in each hidden layer.
         hidden_activation (torch.nn.Module): The activation function for the hidden layers.
         output_activation (torch.nn.Module): The activation function for the output layer.
+        layers (torch.nn.ModuleList): A list of linear layers in the network.
     """
+
     def __init__(self, n_layers, n_units, hidden_activation, output_activation):
-        super(Net, self).__init__()
-        # Creating a list of linear layers with n_units each
-        self.layers = nn.ModuleList([nn.Linear(3, n_units)])
-        for _ in range(n_layers - 1):
-            self.layers.append(nn.Linear(n_units, n_units))
-        # Adding the final output layer with one unit
-        self.layers.append(nn.Linear(n_units, 1))
-        # Storing the activation functions
+        """Initializes the network with the given hyperparameters.
+
+        Args:
+            n_layers (int): The number of hidden layers in the network.
+            n_units (list): A list of integers representing the number of units in each hidden layer.
+            hidden_activation (torch.nn.Module): The activation function for the hidden layers.
+            output_activation (torch.nn.Module): The activation function for the output layer.
+        """
+        super().__init__()
+        self.n_layers = n_layers
+        self.n_units = n_units
         self.hidden_activation = hidden_activation
         self.output_activation = output_activation
 
+        # Creating a list of linear layers with different numbers of units for each layer
+        self.layers = nn.ModuleList([nn.Linear(3, n_units[0])])
+        for i in range(1, n_layers):
+            self.layers.append(nn.Linear(n_units[i - 1], n_units[i]))
+        self.layers.append(nn.Linear(n_units[-1], 1))
+
     def forward(self, x):
-        """Performs a forward pass through the network.
+        """Performs a forward pass on the input tensor.
 
         Args:
             x (torch.Tensor): The input tensor of shape (batch_size, 3).
@@ -89,17 +89,20 @@ class Net(nn.Module):
         Returns:
             torch.Tensor: The output tensor of shape (batch_size, 1).
         """
-        # Passing the input through the hidden layers with the hidden activation function
+        # Looping over the hidden layers and applying the linear transformation and the activation function
         for layer in self.layers[:-1]:
             x = self.hidden_activation(layer(x))
-        # Passing the output through the final layer with the output activation function
+
+        # Applying the linear transformation and the activation function on the output layer
         x = self.output_activation(self.layers[-1](x))
+
+        # Returning the output tensor
         return x
 
 
 # ## Setting the search space
 
-# In[5]:
+# In[17]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -120,16 +123,21 @@ def create_model(trial):
     """
 
     # Sampling the hyperparameters from the search space
-    n_layers = trial.suggest_int("n_layers", 1, 2)
-    n_units = trial.suggest_int("n_units", 2, 32)
-    hidden_activation_name = trial.suggest_categorical("hidden_activation", ["None","ReLU"])
+    n_layers = trial.suggest_int("n_layers", 1, 5)
+    n_layers = trial.suggest_int("n_layers", 1, 5)
+    n_units = [trial.suggest_int(f"n_units_{i}", 1, 256) for i in range(n_layers)]
+    hidden_activation_name = trial.suggest_categorical("hidden_activation", ["ReLU", "Tanh", "Sigmoid"])
     output_activation_name = trial.suggest_categorical("output_activation", ["ReLU", "Tanh", "Sigmoid"])
-    loss_name = trial.suggest_categorical("loss", ["MSE", "MAE"])
-    optimizer_name = trial.suggest_categorical("optimizer", ["SGD", "Adam"])
+    # Added another common loss function: CrossEntropyLoss
+    loss_name = trial.suggest_categorical("loss", ["MSE", "MAE", "Huber", "CrossEntropy"])
+    # Added another common optimizer: Adagrad
+    optimizer_name = trial.suggest_categorical("optimizer", ["SGD", "Adam", "RMSprop", "Adagrad"])
     lr = trial.suggest_loguniform("lr", 1e-5, 1e-1)
-    batch_size = trial.suggest_int("batch_size", 32, 512)
-    n_epochs = trial.suggest_int("n_epochs", 10, 20)
-    scheduler_name = "None"
+    batch_size = trial.suggest_int("batch_size", 1, 512)
+    # Increased the maximum number of epochs that are tried
+    n_epochs = trial.suggest_int("n_epochs", 10, 200)
+    # Added the possibility of having different schedulers: CosineAnnealingLR and ReduceLROnPlateau
+    scheduler_name = trial.suggest_categorical("scheduler", ["None", "StepLR", "ExponentialLR", "CosineAnnealingLR", "ReduceLROnPlateau"])
 
     # Creating the activation functions from their names
     if hidden_activation_name == "ReLU":
@@ -151,25 +159,37 @@ def create_model(trial):
         loss_fn = nn.MSELoss()
     elif loss_name == "MAE":
         loss_fn = nn.L1Loss()
-    else:
+    elif loss_name == "Huber":
         loss_fn = nn.SmoothL1Loss()
+    else:
+        # Added creating the CrossEntropyLoss function
+        loss_fn = nn.CrossEntropyLoss()
 
     # Creating the network with the sampled hyperparameters
-    net = Net(n_layers, n_units, hidden_activation, output_activation)
+    net = Net(n_layers, n_units, hidden_activation, output_activation).to(device) # Added moving the network to the device
 
     # Creating the optimizer from its name
     if optimizer_name == "SGD":
         optimizer = optim.SGD(net.parameters(), lr=lr)
     elif optimizer_name == "Adam":
         optimizer = optim.Adam(net.parameters(), lr=lr)
-    else:
+    elif optimizer_name == "RMSprop":
         optimizer = optim.RMSprop(net.parameters(), lr=lr)
+    else:
+        # Added creating the Adagrad optimizer
+        optimizer = optim.Adagrad(net.parameters(), lr=lr)
 
     # Creating the learning rate scheduler from its name
     if scheduler_name == "StepLR":
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
     elif scheduler_name == "ExponentialLR":
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+    elif scheduler_name == "CosineAnnealingLR":
+        # Added creating the CosineAnnealingLR scheduler
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
+    elif scheduler_name == "ReduceLROnPlateau":
+        # Added creating the ReduceLROnPlateau scheduler
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=10)
     else:
         scheduler = None
 
@@ -179,10 +199,10 @@ def create_model(trial):
 
 # ## The train and eval loop
 
-# In[6]:
+# In[19]:
 
 
-# Defining a function to train and evaluate a network
+# Defining a function to train and evaluate a network on the train and test sets
 def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
     """Trains and evaluates a network on the train and test sets.
 
@@ -273,7 +293,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
     return train_losses, test_losses, train_accuracies, test_accuracies
 
 
-# In[7]:
+# In[20]:
 
 
 # Defining a function to compute the objective value for a trial
@@ -296,9 +316,10 @@ def objective(trial):
     return test_losses[-1]
 
 
+
 # ## Finding the best hyperparameters with Optuna
 
-# In[8]:
+# In[21]:
 
 
 # Creating a study object with Optuna
@@ -329,7 +350,7 @@ torch.save(best_net.state_dict(), "best_net.pth")
 
 # ## Visualizing results
 
-# In[12]:
+# In[10]:
 
 
 # Creating a tensorboard writer
@@ -348,7 +369,7 @@ indices = np.random.choice(len(x_test), size=1000)
 x_sample = x_test[indices]
 y_sample = y_test[indices]
 y_pred = best_net(x_sample).detach().numpy()
-plt.scatter(y_sample, y_pred)
+plt.scatter(y_sample, y_pred, alpha=0.1)
 plt.xlabel("True Values")
 plt.ylabel("Predicted Values")
 plt.title("Predicted Values vs True Values")
@@ -368,7 +389,7 @@ plt.savefig("bias_dist.png")
 
 # ### Pickle
 
-# In[13]:
+# In[11]:
 
 
 import pickle
@@ -392,7 +413,7 @@ with open("best_objects.pkl", "wb") as f:
 # Pandas is not suitable for saving complex objects like PyTorch models, loss functions, optimizers, or schedulers. Pandas is mainly used for saving tabular data, such as lists of numbers or strings. If you want to save these objects for later analysis, you may want to use pickle or torch.save instead. However, if you only want to save the hyperparameters and the metrics, you can use pandas.DataFrame to create a data frame with one row and multiple columns. You can then use pandas.to_csv to write the data frame to a CSV file. For example, you could use the following code:
 # 
 
-# In[16]:
+# In[13]:
 
 
 import pandas as pd
@@ -406,6 +427,7 @@ scheduler_name = type(best_scheduler).__name__ if best_scheduler else "None"
 data = pd.DataFrame({
     "hidden_activation": [best_net.hidden_activation.__class__.__name__],
     "output_activation": [best_net.output_activation.__class__.__name__],
+    "n_units": [str(study.best_params["n_units"])],
     "loss": [loss_name],
     "optimizer": [optimizer_name],
     "lr": [best_optimizer.param_groups[0]["lr"]],
