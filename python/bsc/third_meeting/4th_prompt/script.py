@@ -20,6 +20,8 @@ import optuna
 import tensorboardX as tbx
 
 
+# ## Generating the data
+
 # In[14]:
 
 
@@ -43,6 +45,41 @@ y_train = torch.tensor(y[:8000], dtype=torch.float32).to(device) # Added moving 
 x_test = torch.tensor(x[8000:], dtype=torch.float32).to(device) # Added moving the tensor to the device
 y_test = torch.tensor(y[8000:], dtype=torch.float32).to(device) # Added moving the tensor to the device
 
+
+# ## Checking and visualizing the data
+
+# In[27]:
+
+
+# Checking for NaN values in the data
+print("Number of NaN values in x:", np.isnan(x).sum())
+print("Number of NaN values in y:", np.isnan(y).sum())
+
+# Plotting the input and output variables
+plt.figure(figsize=(12, 8))
+plt.subplot(2, 2, 1)
+plt.scatter(x[:, 0], y)
+plt.xlabel("x0")
+plt.ylabel("y")
+plt.subplot(2, 2, 2)
+plt.scatter(x[:, 1], y)
+plt.xlabel("x1")
+plt.ylabel("y")
+plt.subplot(2, 2, 3)
+plt.scatter(x[:, 2], y)
+plt.xlabel("x2")
+plt.ylabel("y")
+plt.tight_layout()
+plt.show()
+
+# Computing the mean and standard deviation of the data
+print("Mean and standard deviation of x_train:", torch.mean(x_train), torch.std(x_train))
+print("Mean and standard deviation of y_train:", torch.mean(y_train), torch.std(y_train))
+print("Mean and standard deviation of x_test:", torch.mean(x_test), torch.std(x_test))
+print("Mean and standard deviation of y_test:", torch.mean(y_test), torch.std(y_test))
+
+
+# ## Defining the neural network class
 
 # In[16]:
 
@@ -199,7 +236,7 @@ def create_model(trial):
 
 # ## The train and eval loop
 
-# In[19]:
+# In[25]:
 
 
 # Defining a function to train and evaluate a network on the train and test sets
@@ -253,10 +290,6 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
             train_loss += loss.item() * x_batch.size(0)
             train_correct += torch.sum((y_pred - y_batch).abs() < 1e-3)
 
-        # Updating the learning rate scheduler if applicable
-        if scheduler is not None:
-            scheduler.step()
-
         # Setting the network to evaluation mode
         net.eval()
         # Initializing variables to store the total loss and correct predictions for the test set
@@ -285,6 +318,13 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
         test_losses.append(test_loss)
         train_accuracies.append(train_accuracy)
         test_accuracies.append(test_accuracy)
+
+        # Updating the learning rate scheduler with validation loss if applicable
+        if scheduler is not None: # Added checking if scheduler is not None
+            if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                scheduler.step(test_loss) # Added passing validation loss as metric value
+            else:
+                scheduler.step()
 
         # Printing the epoch summary
         print(f"Epoch {epoch + 1}: Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
@@ -319,7 +359,7 @@ def objective(trial):
 
 # ## Finding the best hyperparameters with Optuna
 
-# In[21]:
+# In[26]:
 
 
 # Creating a study object with Optuna
