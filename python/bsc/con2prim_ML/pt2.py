@@ -173,7 +173,7 @@ print("Shape of x_test:", x_test.shape)
 print("Shape of y_test:", y_test.shape)
 
 
-# ## Defining the neural network class
+# ## Defining the neural network
 
 # In[ ]:
 
@@ -238,7 +238,7 @@ class Net(nn.Module):
         return x
 
 
-# ## Setting the search space
+# ## Defining the model and search space
 
 # In[ ]:
 
@@ -392,13 +392,14 @@ def compute_primitive_variables(x_batch, y_pred):
     return rho_pred, vx_pred, epsilon_pred
 
 # Defining a function that computes loss and metrics for a given batch
-def compute_loss_and_metrics(y_pred, y_true, x_batch):
+def compute_loss_and_metrics(y_pred, y_true, x_batch, loss_fn):
     """Computes loss and metrics for a given batch.
 
     Args:
         y_pred (torch.Tensor): The predicted pressure tensor of shape (batch_size, 1).
         y_true (torch.Tensor): The true pressure tensor of shape (batch_size,).
         x_batch (torch.Tensor): The input tensor of shape (batch_size, 3), containing conserved variables.
+        loss_fn (torch.nn.Module or function): The loss function to use.
 
     Returns:
         tuple: A tuple of (loss, rho_error, vx_error, epsilon_error), where loss is a scalar tensor,
@@ -514,8 +515,9 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
             # Performing a forward pass and computing the loss and metrics
             y_pred = net(x_batch)
             loss, rho_error, vx_error, epsilon_error = compute_loss_and_metrics(
-                y_pred, y_batch, x_batch
+                y_pred, y_batch, x_batch, loss_fn
             )
+
 
             # Performing a backward pass and updating the weights
             loss.backward()
@@ -569,8 +571,9 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
                 # Performing a forward pass and computing the loss and metrics
                 y_pred = net(x_batch)
                 loss, rho_error, vx_error, epsilon_error = compute_loss_and_metrics(
-                    y_pred, y_batch, x_batch
+                    y_pred, y_batch, x_batch, loss_fn
                 )
+
 
                 # Updating the total loss and metrics for the test set
                 test_loss += loss.item() * x_batch.size(0)
@@ -650,11 +653,11 @@ def objective(trial):
 # In[ ]:
 
 
-# Creating a study object with Optuna
-study = optuna.create_study(direction="minimize")
+# Creating a study object with Optuna with TPE sampler and median pruner
+study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.MedianPruner())
 
-# Running Optuna with 100 trials using TPE sampler and pruning with median stopping rule
-study.optimize(objective, n_trials=100, sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.MedianPruner())
+# Running Optuna with 100 trials without sampler and pruner arguments
+study.optimize(objective, n_trials=100)
 
 # Printing the best trial information
 print("Best trial:")
