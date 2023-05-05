@@ -5,9 +5,9 @@
 # 
 # We use Optuna to do a type of Bayesian optimization of the hyperparameters of the model. We then train the model using these hyperparameters to recover the primitive pressure from the conserved variables.
 # 
-# Use this first cell to convert the notebook to a python script.
+# Use this first cell to convert this notebook to a python script.
 
-# In[ ]:
+# In[2]:
 
 
 # Importing the libraries
@@ -23,7 +23,7 @@ import tensorboardX as tbx
 
 # ## Generating the data
 
-# In[ ]:
+# In[3]:
 
 
 # Checking if GPU is available and setting the device accordingly
@@ -48,7 +48,7 @@ def eos_analytic(rho, epsilon):
     return (gamma - 1) * rho * epsilon
 
 
-# In[ ]:
+# In[4]:
 
 
 # Defining a function that samples primitive variables from uniform distributions
@@ -156,7 +156,7 @@ def generate_labels(n_samples):
     return p
 
 
-# In[ ]:
+# In[5]:
 
 
 # Generating the input and output data for train and test sets using the functions defined
@@ -175,7 +175,7 @@ print("Shape of y_test:", y_test.shape)
 
 # ## Defining the neural network
 
-# In[ ]:
+# In[6]:
 
 
 # Defining a class for the network
@@ -240,7 +240,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[ ]:
+# In[7]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -252,12 +252,21 @@ def create_model(trial):
 
     Returns:
         tuple: A tuple of (net, loss_fn, optimizer, batch_size, n_epochs,
-            scheduler), where net is the trial network,
+            scheduler, loss_name, optimizer_name, scheduler_name,
+            n_units, n_layers, hidden_activation, output_activation),
+            where net is the trial network,
             loss_fn is the loss function,
             optimizer is the optimizer,
             batch_size is the batch size,
             n_epochs is the number of epochs,
-            scheduler is the learning rate scheduler.
+            scheduler is the learning rate scheduler,
+            loss_name is the name of the loss function,
+            optimizer_name is the name of the optimizer,
+            scheduler_name is the name of the scheduler,
+            n_units is a list of integers representing the number of units in each hidden layer,
+            n_layers is an integer representing the number of hidden layers in the network,
+            hidden_activation is a torch.nn.Module representing the activation function for the hidden layers,
+            output_activation is a torch.nn.Module representing the activation function for the output layer.
     """
 
     # Sampling the hyperparameters from the search space
@@ -345,19 +354,27 @@ def create_model(trial):
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
     elif scheduler_name == "ReduceLROnPlateau":
         # Added creating the ReduceLROnPlateau scheduler
+        # Creating the ReduceLROnPlateau scheduler with a threshold value of 0.01
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.1, patience=10
+            optimizer, mode="min", factor=0.1, patience=10, threshold=0.01
         )
     else:
         scheduler = None
 
-    # Returning the network, the loss function, the optimizer, the batch size, the number of epochs and the scheduler
-    return net, loss_fn, optimizer, batch_size, n_epochs, scheduler
+    # Returning all variables needed for saving and loading
+    return net, loss_fn, optimizer, batch_size, n_epochs, scheduler,\
+        loss_name, optimizer_name, scheduler_name,\
+        n_units, n_layers,\
+        hidden_activation,\
+        output_activation
 
 
-# ## The train and eval loop
 
-# In[ ]:
+# ## The training and evaluation loop
+# 
+# We first define a couple of functions used in the training and evaluation.
+
+# In[8]:
 
 
 # Defining a function that computes primitive variables from conserved variables and predicted pressure
@@ -402,7 +419,7 @@ def compute_loss_and_metrics(y_pred, y_true, x_batch, loss_fn):
         loss_fn (torch.nn.Module or function): The loss function to use.
 
     Returns:
-        tuple: A tuple of (loss, rho_error, vx_error, epsilon_error), where loss is a scalar tensor,
+        tuple: A tuple of (loss, metric, rho_error, vx_error, epsilon_error), where loss is a scalar tensor,
             rho_error is relative error for rest-mass density,
             vx_error is relative error for velocity in x-direction,
             epsilon_error is relative error for specific internal energy,
@@ -453,25 +470,25 @@ def update_scheduler(scheduler, test_loss):
             scheduler.step()
 
 
-# In[ ]:
+# Now for the actual training and evaluation loop,
+
+# In[9]:
 
 
-# Defining a function to train and evaluate a network on the train and test sets
-def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
-    """Trains and evaluates a network on the train and test sets.
+# Defining a function to train and evaluate a network
+def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, trial=None):
+    """Trains and evaluates a network.
 
     Args:
-        net (Net): The network to train and evaluate.
-        loss_fn (torch.nn.Module or function): The loss function to use.
-        optimizer (torch.optim.Optimizer): The optimizer to use.
-        batch_size (int): The batch size to use.
-        n_epochs (int): The number of epochs to train for.
-        scheduler (torch.optim.lr_scheduler._LRScheduler or None): The learning rate scheduler to use.
-
+        net (torch.nn.Module): The network to train and evaluate.
+        loss_fn (torch.nn.Module): The loss function.
+        optimizer (torch.optim.Optimizer): The optimizer.
+        batch_size (int): The batch size.
+        n_epochs (int): The number of epochs.
+        scheduler (torch.optim.lr_scheduler._LRScheduler): The learning rate scheduler.
+        trial (optuna.trial.Trial): The trial object that contains the hyperparameters.
     Returns:
-        tuple: A tuple of (train_losses, test_losses,
-            train_metrics, test_metrics), where train_losses and test_losses are lists of average losses per epoch for the train and test sets,
-            train_metrics and test_metrics are lists of dictionaries of metrics per epoch for the train and test sets.
+        float: The final metric value.
     """
     # Creating data loaders for train and test sets
     train_loader = torch.utils.data.DataLoader(
@@ -614,6 +631,14 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
         # Updating the learning rate scheduler with validation loss if applicable
         update_scheduler(scheduler, test_loss)
 
+        # Reporting the intermediate metric value to Optuna if trial is not None
+        if trial is not None:
+            trial.report(metric.item(), epoch)
+
+            # Checking if the trial should be pruned based on the intermediate value if trial is not None
+            if trial.should_prune():
+                raise optuna.TrialPruned()
+
     # Closing the SummaryWriter object
     writer.close()
 
@@ -623,7 +648,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
 
 # ## The objective function
 
-# In[ ]:
+# In[10]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -637,11 +662,24 @@ def objective(trial):
         float: The validation loss to minimize.
     """
     # Creating a trial network and optimizer using the create_model function
-    net, loss_fn, optimizer, batch_size, n_epochs, scheduler = create_model(trial)
+    net,\
+    loss_fn,\
+    optimizer,\
+    batch_size,\
+    n_epochs,\
+    scheduler,\
+    loss_name,\
+    optimizer_name,\
+    scheduler_name,\
+    n_units,\
+    n_layers,\
+    hidden_activation,\
+    output_activation = create_model(trial)
+
 
     # Training and evaluating the network using the train_and_eval function
     _, _, _, test_metrics = train_and_eval(
-        net, loss_fn, optimizer, batch_size, n_epochs, scheduler
+        net, loss_fn, optimizer, batch_size, n_epochs, scheduler, trial
     )
 
     # Returning the last validation epsilon error as the objective value to minimize
@@ -650,11 +688,11 @@ def objective(trial):
 
 # ## Finding the best parameters with Optuna
 
-# In[ ]:
+# In[11]:
 
 
-# Creating a study object with Optuna with TPE sampler and median pruner
-study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.MedianPruner())
+# Creating a study object with Optuna with TPE sampler and Hyperband pruner
+study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.HyperbandPruner())
 
 # Running Optuna with 100 trials without sampler and pruner arguments
 study.optimize(objective, n_trials=100)
@@ -674,11 +712,24 @@ for key, value in trial.params.items():
 
 
 # Creating the best network and optimizer using the best hyperparameters
-net, loss_fn, optimizer, batch_size, n_epochs, scheduler = create_model(trial)
+net,\
+loss_fn,\
+optimizer,\
+batch_size,\
+n_epochs,\
+scheduler,\
+loss_name,\
+optimizer_name,\
+scheduler_name,\
+n_units,\
+n_layers,\
+hidden_activation,\
+output_activation = create_model(trial)
+
 
 # Training and evaluating the best network using the train_and_eval function
 train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
-    net, loss_fn, optimizer, batch_size, n_epochs, scheduler
+    net, loss_fn, optimizer, batch_size, n_epochs, scheduler, trial
 )
 
 
@@ -717,29 +768,129 @@ plt.tight_layout()
 plt.show()
 
 
-# ## DEPRICATED: Saving and loading the data and the model
+# ## Saving
 
 # In[ ]:
 
 
-# Importing torch and pickle for saving and loading
-import torch
 import pickle
+import pandas as pd
 
-# Saving the data and the model to files
-torch.save(x_train, "x_train.pt")
-torch.save(y_train, "y_train.pt")
-torch.save(x_test, "x_test.pt")
-torch.save(y_test, "y_test.pt")
-torch.save(net_best.state_dict(), "net_best.pt")
-pickle.dump(study.best_params, open("best_params.pkl", "wb"))
+# Saving the best network state dictionary using torch.save
+torch.save(net.state_dict(), "best_net.pth")
 
-# Loading the data and the model from files
-x_train = torch.load("x_train.pt")
-y_train = torch.load("y_train.pt")
-x_test = torch.load("x_test.pt")
-y_test = torch.load("y_test.pt")
-net_best = Net(**study.best_params).to(device) # Creating the network with the best hyperparameters
-net_best.load_state_dict(torch.load("net_best.pt")) # Loading the network weights
-best_params = pickle.load(open("best_params.pkl", "rb")) # Loading the best hyperparameters
+# Saving the loss function name using pickle
+with open("loss_fn.pkl", "wb") as f:
+    pickle.dump(loss_name, f)
+
+# Saving the optimizer name and parameters using pickle
+with open("optimizer.pkl", "wb") as f:
+    pickle.dump((optimizer_name, optimizer.state_dict()), f)
+
+# Saving the best number of epochs using pickle
+with open("n_epochs.pkl", "wb") as f:
+    pickle.dump(n_epochs, f)
+
+# Saving the scheduler name and parameters using pickle
+with open("scheduler.pkl", "wb") as f:
+    pickle.dump((scheduler_name, scheduler.state_dict()), f)
+
+# Saving the number of units for each hidden layer using pickle
+with open("n_units.pkl", "wb") as f:
+    pickle.dump(n_units, f)
+
+# Saving the output of create_model using pickle
+with open("create_model.pkl", "wb") as f:
+    pickle.dump((net, loss_fn, optimizer, batch_size, n_epochs, scheduler), f)
+
+# Saving the output of the training using pandas
+train_df = pd.DataFrame(
+    {
+        "train_loss": train_losses,
+        "test_loss": test_losses,
+        "train_rho_error": [m["rho_error"] for m in train_metrics],
+        "test_rho_error": [m["rho_error"] for m in test_metrics],
+        "train_vx_error": [m["vx_error"] for m in train_metrics],
+        "test_vx_error": [m["vx_error"] for m in test_metrics],
+        "train_epsilon_error": [m["epsilon_error"] for m in train_metrics],
+        "test_epsilon_error": [m["epsilon_error"] for m in test_metrics],
+    }
+)
+train_df.to_csv("train_output.csv", index=False)
+
+
+# ## Loading
+
+# In[ ]:
+
+
+## Loading the best network state dictionary using torch.load
+state_dict = torch.load("best_net.pth")
+
+# Loading the state dictionary into a new network instance using net.load_state_dict
+new_net = Net(n_layers, n_units, hidden_activation, output_activation).to(device)
+new_net.load_state_dict(state_dict)
+
+
+# In[ ]:
+
+
+# Loading the loss function name using pickle
+with open("loss_fn.pkl", "rb") as f:
+    loss_name = pickle.load(f)
+
+# Loading the optimizer name and parameters using pickle
+with open("optimizer.pkl", "rb") as f:
+    optimizer_name, optimizer_state_dict = pickle.load(f)
+
+# Loading the best number of epochs using pickle
+with open("n_epochs.pkl", "rb") as f:
+    n_epochs = pickle.load(f)
+
+# Loading the scheduler name and parameters using pickle
+with open("scheduler.pkl", "rb") as f:
+    scheduler_name, scheduler_state_dict = pickle.load(f)
+
+# Loading the number of units for each hidden layer using pickle
+with open("n_units.pkl", "rb") as f:
+    n_units = pickle.load(f)
+
+# Loading the output of create_model using pickle
+with open("create_model.pkl", "rb") as f:
+    net, loss_fn, optimizer, batch_size, n_epochs, scheduler = pickle.load(f)
+
+# Loading the output of the training using pandas
+train_df = pd.read_csv("train_output.csv")
+train_losses = train_df["train_loss"].tolist()
+test_losses = train_df["test_loss"].tolist()
+train_metrics = [
+    {
+        "rho_error": train_df["train_rho_error"][i],
+        "vx_error": train_df["train_vx_error"][i],
+        "epsilon_error": train_df["train_epsilon_error"][i],
+    }
+    for i in range(len(train_df))
+]
+test_metrics = [
+    {
+        "rho_error": train_df["test_rho_error"][i],
+        "vx_error": train_df["test_vx_error"][i],
+        "epsilon_error": train_df["test_epsilon_error"][i],
+    }
+    for i in range(len(train_df))
+]
+
+
+# ## Testing
+
+# In[ ]:
+
+
+get_ipython().run_line_magic('load_ext', 'ipython_unittest')
+
+
+# In[ ]:
+
+
+get_ipython().run_cell_magic('unittest_main', '', '\n# Importing the unittest module\nimport unittest\n\n# Defining a class for testing the network and functions\nclass TestNet(unittest.TestCase):\n\n    # Defining a setup method to create a network and data\n    def setUp(self):\n        # Creating a network with fixed hyperparameters\n        self.net = Net(\n            n_layers=3,\n            n_units=[64, 32, 16],\n            hidden_activation=nn.ReLU(),\n            output_activation=nn.ReLU()\n        ).to(device)\n\n        # Creating a loss function\n        self.loss_fn = nn.MSELoss()\n\n        # Creating a batch of input and output data\n        self.x_batch = generate_input_data(10)\n        self.y_batch = generate_labels(10)\n\n    # Defining a test method to check if the network output has the correct shape\n    def test_net_output_shape(self):\n        # Performing a forward pass on the input data\n        y_pred = self.net(self.x_batch)\n\n        # Checking if the output shape matches the expected shape\n        self.assertEqual(y_pred.shape, (10, 1))\n\n    # Defining a test method to check if the eos_analytic function returns the correct pressure\n    def test_eos_analytic(self):\n        # Creating some sample primitive variables\n        rho = torch.tensor([1.0, 2.0, 3.0])\n        epsilon = torch.tensor([0.5, 1.0, 1.5])\n\n        # Computing the pressure using the eos_analytic function\n        p = eos_analytic(rho, epsilon)\n\n        # Checking if the pressure matches the expected values\n        self.assertTrue(torch.allclose(p, torch.tensor([0.6667, 2.6667, 6.0000]), atol=1e-4))\n\n    # Defining a test method to check if the compute_conserved_variables function returns the correct values\n    def test_compute_conserved_variables(self):\n        # Creating some sample primitive variables\n        rho = torch.tensor([1.0, 2.0, 3.0])\n        vx = torch.tensor([0.1 * c, 0.2 * c, 0.3 * c])\n        epsilon = torch.tensor([0.5, 1.0, 1.5])\n\n        # Computing the conserved variables using the compute_conserved_variables function\n        D, Sx, tau = compute_conserved_variables(rho, vx, epsilon)\n\n        # Checking if the conserved variables match the expected values\n        self.assertTrue(torch.allclose(D, torch.tensor([1.0050, 2.0202, 3.0469]), atol=1e-4))\n        self.assertTrue(torch.allclose(Sx, torch.tensor([0.1005, 0.4041, 0.9188]), atol=1e-4))\n        self.assertTrue(torch.allclose(tau, torch.tensor([0.6716, 3.3747, 8.1099]), atol=1e-4))\n\n    # Defining a test method to check if the compute_primitive_variables function returns the correct values\n    def test_compute_primitive_variables(self):\n        # Creating some sample conserved variables and predicted pressure\n        x_batch = torch.tensor([[1.0050, 0.1005, 0.6716], [2.0202, 0.4041, 3.3747], [3.0469, 0.9188, 8.1099]])\n        y_pred = torch.tensor([[0.6667], [2.6667], [6.0000]])\n\n        # Computing the primitive variables using the compute_primitive_variables function\n        rho_pred, vx_pred, epsilon_pred = compute_primitive_variables(x_batch, y_pred)\n\n        # Checking if the primitive variables match the expected values\n        self.assertTrue(torch.allclose(rho_pred, torch.tensor([1.0000, 2.0000, 3.0000]), atol=1e-4))\n        self.assertTrue(torch.allclose(vx_pred / c , torch.tensor([0.1000 , 0.2000 , 0.3000 ]), atol=1e-4))\n        self.assertTrue(torch.allclose(epsilon_pred , torch.tensor([0.5000 , 1.0000 , 1.5000 ]), atol=1e-4))\n\n    # Following function is to test if the loss function and metrics are computed correctly and that the\n    # torch tensors don’t have different shapes for y_pred and y_true in my compute_loss_and_metrics\n    # function.\n    # Defining a test method to check if the compute_loss_and_metrics function returns the correct values\n    def test_compute_loss_and_metrics(self):\n        # Creating some sample predicted and true pressure values\n        y_pred = torch.tensor([[0.6667], [2.6667], [6.0000]])\n        y_true = torch.tensor([[0.7000], [2.5000], [5.8000]])\n\n        # Computing the loss and metric using the compute_loss_and_metrics function\n        loss, metric = compute_loss_and_metrics(y_pred, y_true)\n\n        # Checking if the loss and metric match the expected values\n        self.assertTrue(torch.allclose(loss, torch.tensor(0.0167), atol=1e-4))\n        self.assertTrue(torch.allclose(metric, torch.tensor(0.0329), atol=1e-4))\n\n    # Defining a test method to check if the compute_loss_and_metrics function raises an error when y_pred and y_true have different shapes\n    def test_compute_loss_and_metrics_error(self):\n        # Creating some sample predicted and true pressure values with different shapes\n        y_pred = torch.tensor([[0.6667], [2.6667], [6.0000]])\n        y_true = torch.tensor([0.7000, 2.5000, 5.8000])\n\n        # Asserting that an error is raised when calling the compute_loss_and_metrics function with different shapes\n        self.assertRaises(ValueError, compute_loss_and_metrics, y_pred, y_true)\n\n')
 
