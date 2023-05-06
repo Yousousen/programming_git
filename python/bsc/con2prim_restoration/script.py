@@ -7,7 +7,7 @@
 # 
 # Use this first cell to convert this notebook to a python script.
 
-# In[ ]:
+# In[8]:
 
 
 # Importing the libraries
@@ -359,7 +359,7 @@ def create_model(trial):
         scheduler = None
 
     # Returning all variables needed for saving and loading
-    return net, loss_fn, optimizer, batch_size, n_epochs, scheduler,        loss_name, optimizer_name, scheduler_name,        n_units, n_layers, hidden_activation, output_activation
+    return net, loss_fn, optimizer, batch_size, n_epochs, scheduler, loss_name, optimizer_name, scheduler_name, n_units, n_layers, hidden_activation, output_activation
 
 
 # ## The training and evaluation loop
@@ -785,18 +785,4 @@ test_metrics = [
     }
     for i in range(len(train_df))
 ]
-
-
-# ## Testing
-
-# In[ ]:
-
-
-get_ipython().run_line_magic('load_ext', 'ipython_unittest')
-
-
-# In[ ]:
-
-
-get_ipython().run_cell_magic('unittest_main', '', '\n# Importing the unittest module\nimport unittest\n\n# Defining a class for testing the network and functions\nclass TestNet(unittest.TestCase):\n\n    # Defining a setup method to create a network and data\n    def setUp(self):\n        # Creating a network with fixed hyperparameters\n        self.net = Net(\n            n_layers=3,\n            n_units=[64, 32, 16],\n            hidden_activation=nn.ReLU(),\n            output_activation=nn.ReLU()\n        ).to(device)\n\n        # Creating a loss function\n        self.loss_fn = nn.MSELoss()\n\n        # Creating a batch of input and output data\n        self.x_batch = generate_input_data(10)\n        self.y_batch = generate_labels(10)\n\n    # Defining a test method to check if the network output has the correct shape\n    def test_net_output_shape(self):\n        # Performing a forward pass on the input data\n        y_pred = self.net(self.x_batch)\n\n        # Checking if the output shape matches the expected shape\n        self.assertEqual(y_pred.shape, (10, 1))\n\n    # Defining a test method to check if the eos_analytic function returns the correct pressure\n    def test_eos_analytic(self):\n        # Creating some sample primitive variables\n        rho = torch.tensor([1.0, 2.0, 3.0])\n        epsilon = torch.tensor([0.5, 1.0, 1.5])\n\n        # Computing the pressure using the eos_analytic function\n        p = eos_analytic(rho, epsilon)\n\n        # Checking if the pressure matches the expected values\n        self.assertTrue(torch.allclose(p, torch.tensor([0.6667, 2.6667, 6.0000]), atol=1e-4))\n\n    # Defining a test method to check if the compute_conserved_variables function returns the correct values\n    def test_compute_conserved_variables(self):\n        # Creating some sample primitive variables\n        rho = torch.tensor([1.0, 2.0, 3.0])\n        vx = torch.tensor([0.1 * c, 0.2 * c, 0.3 * c])\n        epsilon = torch.tensor([0.5, 1.0, 1.5])\n\n        # Computing the conserved variables using the compute_conserved_variables function\n        D, Sx, tau = compute_conserved_variables(rho, vx, epsilon)\n\n        # Checking if the conserved variables match the expected values\n        self.assertTrue(torch.allclose(D, torch.tensor([1.0050, 2.0202, 3.0469]), atol=1e-4))\n        self.assertTrue(torch.allclose(Sx, torch.tensor([0.1005, 0.4041, 0.9188]), atol=1e-4))\n        self.assertTrue(torch.allclose(tau, torch.tensor([0.6716, 3.3747, 8.1099]), atol=1e-4))\n\n    # Defining a test method to check if the compute_primitive_variables function returns the correct values\n    def test_compute_primitive_variables(self):\n        # Creating some sample conserved variables and predicted pressure\n        x_batch = torch.tensor([[1.0050, 0.1005, 0.6716], [2.0202, 0.4041, 3.3747], [3.0469, 0.9188, 8.1099]])\n        y_pred = torch.tensor([[0.6667], [2.6667], [6.0000]])\n\n        # Computing the primitive variables using the compute_primitive_variables function\n        rho_pred, vx_pred, epsilon_pred = compute_primitive_variables(x_batch, y_pred)\n\n        # Checking if the primitive variables match the expected values\n        self.assertTrue(torch.allclose(rho_pred, torch.tensor([1.0000, 2.0000, 3.0000]), atol=1e-4))\n        self.assertTrue(torch.allclose(vx_pred / c , torch.tensor([0.1000 , 0.2000 , 0.3000 ]), atol=1e-4))\n        self.assertTrue(torch.allclose(epsilon_pred , torch.tensor([0.5000 , 1.0000 , 1.5000 ]), atol=1e-4))\n\n    # Following function is to test if the loss function and metrics are computed correctly and that the\n    # torch tensors don’t have different shapes for y_pred and y_true in my compute_loss_and_metrics\n    # function.\n    # Defining a test method to check if the compute_loss_and_metrics function returns the correct values\n    def test_compute_loss_and_metrics(self):\n        # Creating some sample predicted and true pressure values\n        y_pred = torch.tensor([[0.6667], [2.6667], [6.0000]])\n        y_true = torch.tensor([[0.7000], [2.5000], [5.8000]])\n\n        # Computing the loss and metric using the compute_loss_and_metrics function\n        loss, metric = compute_loss_and_metrics(y_pred, y_true)\n\n        # Checking if the loss and metric match the expected values\n        self.assertTrue(torch.allclose(loss, torch.tensor(0.0167), atol=1e-4))\n        self.assertTrue(torch.allclose(metric, torch.tensor(0.0329), atol=1e-4))\n\n    # Defining a test method to check if the compute_loss_and_metrics function raises an error when y_pred and y_true have different shapes\n    def test_compute_loss_and_metrics_error(self):\n        # Creating some sample predicted and true pressure values with different shapes\n        y_pred = torch.tensor([[0.6667], [2.6667], [6.0000]])\n        y_true = torch.tensor([0.7000, 2.5000, 5.8000])\n\n        # Asserting that an error is raised when calling the compute_loss_and_metrics function with different shapes\n        self.assertRaises(ValueError, compute_loss_and_metrics, y_pred, y_true)\n')
 
