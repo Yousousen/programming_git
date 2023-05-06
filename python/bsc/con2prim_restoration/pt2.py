@@ -616,7 +616,19 @@ def objective(trial):
         float: The validation L1 norm to minimize.
     """
     # Creating a trial network and optimizer using the create_model function
-    net, loss_fn, optimizer, batch_size, n_epochs, scheduler = create_model(trial) # CHANGED: Unpacked all variables from create_model function
+    net, \
+    loss_fn, \
+    optimizer, \
+    batch_size, \
+    n_epochs, \
+    scheduler, \
+    loss_name, \
+    optimizer_name, \
+    scheduler_name, \
+    n_units, \
+    n_layers, \
+    hidden_activation, \
+    output_activation = create_model(trial)
 
     # Training and evaluating the network using the train_and_eval function
     _, _, _, test_metrics = train_and_eval(
@@ -651,7 +663,20 @@ for key, value in trial.params.items():
 
 
 # Creating the best network and optimizer using the best hyperparameters
-net,loss_fn,optimizer,batch_size,n_epochs,scheduler = create_model(trial) # CHANGED: Unpacked all variables from create_model function
+net, \
+loss_fn, \
+optimizer, \
+batch_size, \
+n_epochs, \
+scheduler, \
+loss_name, \
+optimizer_name, \
+scheduler_name, \
+n_units, \
+n_layers, \
+hidden_activation, \
+output_activation = create_model(trial)
+
 
 
 # Training and evaluating the best network using the train_and_eval function
