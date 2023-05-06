@@ -3,7 +3,5 @@ numpy
 pandas
 matplotlib
 torch
-#ray[tune]
-#scikit-learn
-#scikit-optimize
 optuna
+tensorboard
