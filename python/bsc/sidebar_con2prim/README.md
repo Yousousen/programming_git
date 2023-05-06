@@ -1,3 +1,5 @@
+rel. `bsc_physics.md`: _Sidebar discussions_, _10:26_
+
 New directory for the consideration of the neural network for the conversion from conservative to primitive variables using sidebar Bing for the analysis of the PDF. This is due to our results of today (Sat May  6 11:55:44 AM CEST 2023) in which we found that Bing has a lot of confusions about the Dieseldorst et al. paper if it looks it up on the internet; these confusions can be read back in `con2prim_ML/chat/abhorted_prompts/`; we have the `pt3_mod_confused_prompt` as well as the collection of confused prompts which are html files around the time 10:28 of this date.
 
-Still we trust the general structure of the code as we have created it so far in `pt2.ipynb` enough to continue with it. However, it requires some modifications, as we will discuss starting in `bsc_physics.md`: _Sidebar discussions_
+Still we trust the general structure of the code as we have created it so far in `pt2.ipynb` enough to continue with it. However, it requires some modifications, as we discus in [rel].
