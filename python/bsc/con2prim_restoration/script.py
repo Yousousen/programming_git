@@ -7,7 +7,7 @@
 # 
 # Use this first cell to convert this notebook to a python script.
 
-# In[1]:
+# In[ ]:
 
 
 # Importing the libraries
@@ -24,7 +24,7 @@ import tensorboardX as tbx
 
 # ## Generating the data
 
-# In[3]:
+# In[ ]:
 
 
 # Checking if GPU is available and setting the device accordingly
@@ -47,9 +47,6 @@ def eos_analytic(rho, epsilon):
         torch.Tensor: The pressure tensor of shape (n_samples,).
     """
     return (gamma - 1) * rho * epsilon
-
-
-# In[4]:
 
 
 # Defining a function that samples primitive variables from uniform distributions
@@ -157,7 +154,7 @@ def generate_labels(n_samples):
     return p
 
 
-# In[5]:
+# In[ ]:
 
 
 # Generating the input and output data for train and test sets using the functions defined
@@ -176,7 +173,7 @@ print("Shape of y_test:", y_test.shape)
 
 # ## Defining the neural network
 
-# In[6]:
+# In[ ]:
 
 
 # Defining a class for the network
@@ -231,7 +228,6 @@ class Net(nn.Module):
         # Looping over the hidden layers and applying the linear transformation and the activation function
         for layer in self.layers[:-1]:
             x = self.hidden_activation(layer(x))
-
         # Applying the linear transformation and the activation function on the output layer
         x = self.output_activation(self.layers[-1](x))
 
@@ -241,7 +237,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[7]:
+# In[ ]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -363,62 +359,29 @@ def create_model(trial):
         scheduler = None
 
     # Returning all variables needed for saving and loading
-    return net, loss_fn, optimizer, batch_size, n_epochs, scheduler,        loss_name, optimizer_name, scheduler_name,        n_units, n_layers,        hidden_activation,        output_activation
+    return net, loss_fn, optimizer, batch_size, n_epochs, scheduler,        loss_name, optimizer_name, scheduler_name,        n_units, n_layers, hidden_activation, output_activation
 
 
 # ## The training and evaluation loop
 # 
 # We first define a couple of functions used in the training and evaluation.
 
-# In[8]:
+# In[ ]:
 
-
-# Defining a function that computes primitive variables from conserved variables and predicted pressure
-def compute_primitive_variables(x_batch, y_pred):
-    """Computes primitive variables from conserved variables and predicted pressure.
-
-    Args:
-        x_batch (torch.Tensor): The input tensor of shape (batch_size, 3), containing conserved variables.
-        y_pred (torch.Tensor): The predicted pressure tensor of shape (batch_size, 1).
-
-    Returns:
-        tuple: A tuple of (rho_pred, vx_pred, epsilon_pred), where rho_pred is rest-mass density,
-            vx_pred is velocity in x-direction,
-            epsilon_pred is specific internal energy,
-            each being a torch tensor of shape (batch_size,).
-    """
-    # Extracting the conserved variables from x_batch
-    D_batch = x_batch[:, 0]  # Conserved density
-    Sx_batch = x_batch[:, 1]  # Conserved momentum in x-direction
-    tau_batch = x_batch[:, 2]  # Conserved energy density
-
-    # Computing the other primitive variables from y_pred and x_batch
-    rho_pred = D_batch / torch.sqrt(1 + Sx_batch ** 2 / D_batch ** 2 / c ** 2)  # Rest-mass density
-    vx_pred = Sx_batch / D_batch / c ** 2 / torch.sqrt(
-        1 + Sx_batch ** 2 / D_batch ** 2 / c ** 2
-    )  # Velocity in x-direction
-    epsilon_pred = (
-        tau_batch + D_batch
-    ) / rho_pred - y_pred / rho_pred - 1  # Specific internal energy
-
-    # Returning the primitive variables
-    return rho_pred, vx_pred, epsilon_pred
 
 # Defining a function that computes loss and metrics for a given batch
-def compute_loss_and_metrics(y_pred, y_true, x_batch, loss_fn):
+def compute_loss_and_metrics(y_pred, y_true, loss_fn):
     """Computes loss and metrics for a given batch.
 
     Args:
         y_pred (torch.Tensor): The predicted pressure tensor of shape (batch_size, 1).
         y_true (torch.Tensor): The true pressure tensor of shape (batch_size,).
-        x_batch (torch.Tensor): The input tensor of shape (batch_size, 3), containing conserved variables.
         loss_fn (torch.nn.Module or function): The loss function to use.
 
     Returns:
-        tuple: A tuple of (loss, metric, rho_error, vx_error, epsilon_error), where loss is a scalar tensor,
-            rho_error is relative error for rest-mass density,
-            vx_error is relative error for velocity in x-direction,
-            epsilon_error is relative error for specific internal energy,
+        tuple: A tuple of (loss, l1_norm, linf_norm), where loss is a scalar tensor,
+            l1_norm is L1 norm for relative error of pressure,
+            linf_norm is L∞ norm for relative error of pressure,
             each being a scalar tensor.
     """
     # Reshaping the target tensor to match the input tensor
@@ -427,21 +390,15 @@ def compute_loss_and_metrics(y_pred, y_true, x_batch, loss_fn):
     # Computing the loss using the loss function
     loss = loss_fn(y_pred, y_true)
 
-    # Computing the other primitive variables from y_pred and x_batch using the compute_primitive_variables function
-    rho_pred, vx_pred, epsilon_pred = compute_primitive_variables(x_batch, y_pred)
+    # Computing the relative error of pressure
+    rel_error = torch.abs((y_pred - y_true) / y_true)
 
-    # Computing the true values of the other primitive variables from y_true and x_batch using the compute_primitive_variables function
-    rho_true, vx_true, epsilon_true = compute_primitive_variables(x_batch, y_true)
-
-    # Computing the relative errors for the other primitive variables
-    rho_error = torch.mean(torch.abs((rho_pred - rho_true) / rho_true))  # Relative error for rest-mass density
-    vx_error = torch.mean(torch.abs((vx_pred - vx_true) / vx_true))  # Relative error for velocity in x-direction
-    epsilon_error = torch.mean(
-        torch.abs((epsilon_pred - epsilon_true) / epsilon_true)
-    )  # Relative error for specific internal energy
+    # Computing the L1 and L∞ norms for the relative error of pressure
+    l1_norm = torch.mean(rel_error)  # L1 norm
+    linf_norm = torch.max(rel_error)  # L∞ norm
 
     # Returning the loss and metrics
-    return loss, rho_error, vx_error, epsilon_error
+    return loss, l1_norm, linf_norm
 
 
 # Defining a function that updates the learning rate scheduler with validation loss if applicable
@@ -468,23 +425,26 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[9]:
+# In[ ]:
 
 
 # Defining a function to train and evaluate a network
-def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, trial=None):
+def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
     """Trains and evaluates a network.
 
     Args:
         net (torch.nn.Module): The network to train and evaluate.
-        loss_fn (torch.nn.Module): The loss function.
+        loss_fn (torch.nn.Module or function): The loss function.
         optimizer (torch.optim.Optimizer): The optimizer.
         batch_size (int): The batch size.
         n_epochs (int): The number of epochs.
-        scheduler (torch.optim.lr_scheduler._LRScheduler): The learning rate scheduler.
-        trial (optuna.trial.Trial): The trial object that contains the hyperparameters.
+        scheduler (torch.optim.lr_scheduler._LRScheduler or None): The learning rate scheduler.
     Returns:
-        float: The final metric value.
+        tuple: A tuple of (train_losses, test_losses, train_metrics, test_metrics), where
+            train_losses is a list of training losses for each epoch,
+            test_losses is a list of validation losses for each epoch,
+            train_metrics is a list of dictionaries containing training metrics for each epoch,
+            test_metrics is a list of dictionaries containing validation metrics for each epoch.
     """
     # Creating data loaders for train and test sets
     train_loader = torch.utils.data.DataLoader(
@@ -511,9 +471,8 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
         # Initializing variables to store the total loss and metrics for the train set
         train_loss = 0.0
-        train_rho_error = 0.0
-        train_vx_error = 0.0
-        train_epsilon_error = 0.0
+        train_l1_norm = 0.0
+        train_linf_norm = 0.0
 
         # Looping over the batches in the train set
         for x_batch, y_batch in train_loader:
@@ -527,8 +486,8 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
             # Performing a forward pass and computing the loss and metrics
             y_pred = net(x_batch)
-            loss, rho_error, vx_error, epsilon_error = compute_loss_and_metrics(
-                y_pred, y_batch, x_batch, loss_fn
+            loss, l1_norm, linf_norm = compute_loss_and_metrics(
+                y_pred, y_batch, loss_fn
             )
 
 
@@ -538,40 +497,35 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
             # Updating the total loss and metrics for the train set
             train_loss += loss.item() * x_batch.size(0)
-            train_rho_error += rho_error.item() * x_batch.size(0)
-            train_vx_error += vx_error.item() * x_batch.size(0)
-            train_epsilon_error += epsilon_error.item() * x_batch.size(0)
+            train_l1_norm += l1_norm.item() * x_batch.size(0)
+            train_linf_norm += linf_norm.item() * x_batch.size(0)
 
         # Computing the average loss and metrics for the train set
         train_loss /= len(train_loader.dataset)
-        train_rho_error /= len(train_loader.dataset)
-        train_vx_error /= len(train_loader.dataset)
-        train_epsilon_error /= len(train_loader.dataset)
+        train_l1_norm /= len(train_loader.dataset)
+        train_linf_norm /= len(train_loader.dataset)
 
         # Appending the average loss and metrics for the train set to the lists
         train_losses.append(train_loss)
         train_metrics.append(
             {
-                "rho_error": train_rho_error,
-                "vx_error": train_vx_error,
-                "epsilon_error": train_epsilon_error,
+                "l1_norm": train_l1_norm,
+                "linf_norm": train_linf_norm,
             }
         )
 
         # Logging the average loss and metrics for the train set to tensorboard
         writer.add_scalar("Loss/train", train_loss, epoch)
-        writer.add_scalar("Rho error/train", train_rho_error, epoch)
-        writer.add_scalar("Vx error/train", train_vx_error, epoch)
-        writer.add_scalar("Epsilon error/train", train_epsilon_error, epoch)
+        writer.add_scalar("L1 norm/train", train_l1_norm, epoch)
+        writer.add_scalar("L∞ norm/train", train_linf_norm, epoch)
 
         # Setting the network to evaluation mode
         net.eval()
 
         # Initializing variables to store the total loss and metrics for the test set
         test_loss = 0.0
-        test_rho_error = 0.0
-        test_vx_error = 0.0
-        test_epsilon_error = 0.0
+        test_l1_norm = 0.0
+        test_linf_norm = 0.0
 
         # Looping over the batches in the test set
         with torch.no_grad():
@@ -583,57 +537,44 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
                 # Performing a forward pass and computing the loss and metrics
                 y_pred = net(x_batch)
-                loss, rho_error, vx_error, epsilon_error = compute_loss_and_metrics(
-                    y_pred, y_batch, x_batch, loss_fn
+                loss, l1_norm, linf_norm = compute_loss_and_metrics(
+                    y_pred, y_batch, loss_fn
                 )
 
 
                 # Updating the total loss and metrics for the test set
                 test_loss += loss.item() * x_batch.size(0)
-                test_rho_error += rho_error.item() * x_batch.size(0)
-                test_vx_error += vx_error.item() * x_batch.size(0)
-                test_epsilon_error += epsilon_error.item() * x_batch.size(0)
+                test_l1_norm += l1_norm.item() * x_batch.size(0)
+                test_linf_norm += linf_norm.item() * x_batch.size(0)
 
         # Computing the average loss and metrics for the test set
         test_loss /= len(test_loader.dataset)
-        test_rho_error /= len(test_loader.dataset)
-        test_vx_error /= len(test_loader.dataset)
-        test_epsilon_error /= len(test_loader.dataset)
+        test_l1_norm /= len(test_loader.dataset)
+        test_linf_norm /= len(test_loader.dataset)
 
         # Appending the average loss and metrics for the test set to the lists
         test_losses.append(test_loss)
         test_metrics.append(
             {
-                "rho_error": test_rho_error,
-                "vx_error": test_vx_error,
-                "epsilon_error": test_epsilon_error,
+                "l1_norm": test_l1_norm,
+                "linf_norm": test_linf_norm,
             }
         )
 
         # Logging the average loss and metrics for the test set to tensorboard
         writer.add_scalar("Loss/test", test_loss, epoch)
-        writer.add_scalar("Rho error/test", test_rho_error, epoch)
-        writer.add_scalar("Vx error/test", test_vx_error, epoch)
-        writer.add_scalar("Epsilon error/test", test_epsilon_error, epoch)
+        writer.add_scalar("L1 norm/test", test_l1_norm, epoch)
+        writer.add_scalar("L∞ norm/test", test_linf_norm, epoch)
 
         # Printing the average loss and metrics for both sets for this epoch
         print(
             f"Epoch {epoch + 1}: Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}, "
-            f"Train Rho Error: {train_rho_error:.4f}, Test Rho Error: {test_rho_error:.4f}, "
-            f"Train Vx Error: {train_vx_error:.4f}, Test Vx Error: {test_vx_error:.4f}, "
-            f"Train Epsilon Error: {train_epsilon_error:.4f}, Test Epsilon Error: {test_epsilon_error:.4f}"
+            f"Train L1 Norm: {train_l1_norm:.4f}, Test L1 Norm: {test_l1_norm:.4f}, "
+            f"Train L∞ Norm: {train_linf_norm:.4f}, Test L∞ Norm: {test_linf_norm:.4f}"
         )
 
         # Updating the learning rate scheduler with validation loss if applicable
         update_scheduler(scheduler, test_loss)
-
-        # Reporting the intermediate metric value to Optuna if trial is not None
-        if trial is not None:
-            trial.report(metric.item(), epoch)
-
-            # Checking if the trial should be pruned based on the intermediate value if trial is not None
-            if trial.should_prune():
-                raise optuna.TrialPruned()
 
     # Closing the SummaryWriter object
     writer.close()
@@ -642,9 +583,9 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
     return train_losses, test_losses, train_metrics, test_metrics
 
 
-# ## The objective function
+# ## The objective function and hyperparameter tuning
 
-# In[10]:
+# In[ ]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -655,24 +596,21 @@ def objective(trial):
         trial (optuna.trial.Trial): The trial object that contains the hyperparameters.
 
     Returns:
-        float: The validation loss to minimize.
+        float: The validation L1 norm to minimize.
     """
     # Creating a trial network and optimizer using the create_model function
-    net,    loss_fn,    optimizer,    batch_size,    n_epochs,    scheduler,    loss_name,    optimizer_name,    scheduler_name,    n_units,    n_layers,    hidden_activation,    output_activation = create_model(trial)
-
+    net, loss_fn, optimizer, batch_size, n_epochs, scheduler = create_model(trial)
 
     # Training and evaluating the network using the train_and_eval function
     _, _, _, test_metrics = train_and_eval(
         net, loss_fn, optimizer, batch_size, n_epochs, scheduler, trial
     )
 
-    # Returning the last validation epsilon error as the objective value to minimize
-    return test_metrics[-1]["epsilon_error"]
+    # Returning the last validation L1 norm as the objective value to minimize
+    return test_metrics[-1]["l1_norm"]
 
 
-# ## Finding the best parameters with Optuna
-
-# In[11]:
+# In[ ]:
 
 
 # Creating a study object with Optuna with TPE sampler and Hyperband pruner
@@ -695,13 +633,15 @@ for key, value in trial.params.items():
 # In[ ]:
 
 
+# ## Training with the best hyperparameters
+
 # Creating the best network and optimizer using the best hyperparameters
 net,loss_fn,optimizer,batch_size,n_epochs,scheduler,loss_name,optimizer_name,scheduler_name,n_units,n_layers,hidden_activation,output_activation = create_model(trial)
 
 
 # Training and evaluating the best network using the train_and_eval function
 train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
-    net, loss_fn, optimizer, batch_size, n_epochs, scheduler, trial
+    net, loss_fn, optimizer, batch_size, n_epochs, scheduler
 )
 
 
@@ -719,22 +659,16 @@ plt.xlabel("Epoch")
 plt.ylabel("Loss")
 plt.legend()
 plt.subplot(2, 2, 2)
-plt.plot([m["rho_error"] for m in train_metrics], label="Train Rho Error")
-plt.plot([m["rho_error"] for m in test_metrics], label="Test Rho Error")
+plt.plot([m["l1_norm"] for m in train_metrics], label="Train L1 Norm")
+plt.plot([m["l1_norm"] for m in test_metrics], label="Test L1 Norm")
 plt.xlabel("Epoch")
-plt.ylabel("Rho Error")
+plt.ylabel("L1 Norm")
 plt.legend()
 plt.subplot(2, 2, 3)
-plt.plot([m["vx_error"] for m in train_metrics], label="Train Vx Error")
-plt.plot([m["vx_error"] for m in test_metrics], label="Test Vx Error")
+plt.plot([m["linf_norm"] for m in train_metrics], label="Train L∞ Norm")
+plt.plot([m["linf_norm"] for m in test_metrics], label="Test L∞ Norm")
 plt.xlabel("Epoch")
-plt.ylabel("Vx Error")
-plt.legend()
-plt.subplot(2, 2, 4)
-plt.plot([m["epsilon_error"] for m in train_metrics], label="Train Epsilon Error")
-plt.plot([m["epsilon_error"] for m in test_metrics], label="Test Epsilon Error")
-plt.xlabel("Epoch")
-plt.ylabel("Epsilon Error")
+plt.ylabel("L∞ Norm")
 plt.legend()
 plt.tight_layout()
 plt.show()
