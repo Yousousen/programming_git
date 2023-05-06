@@ -375,7 +375,7 @@ def create_model(trial):
 
 # Defining a function that computes primitive variables from conserved variables and predicted pressure
 def compute_primitive_variables(x_batch, y_pred):
-    """Computes primitive variables from conserved variables and predicted pressure using equations (A2) to (A5) from the paper.
+    """Computes primitive variables from conserved variables and predicted pressure.
 
     Args:
         x_batch (torch.Tensor): The input tensor of shape (batch_size, 3), containing conserved variables.
@@ -392,7 +392,7 @@ def compute_primitive_variables(x_batch, y_pred):
     Sx_batch = x_batch[:, 1]  # Conserved momentum in x-direction
     tau_batch = x_batch[:, 2]  # Conserved energy density
 
-    # Computing the other primitive variables from y_pred and x_batch using equations (A2) to (A5) from the paper
+    # Computing the other primitive variables from y_pred and x_batch
     rho_pred = D_batch / torch.sqrt(1 + Sx_batch ** 2 / D_batch ** 2 / c ** 2)  # Rest-mass density
     vx_pred = Sx_batch / D_batch / c ** 2 / torch.sqrt(
         1 + Sx_batch ** 2 / D_batch ** 2 / c ** 2
