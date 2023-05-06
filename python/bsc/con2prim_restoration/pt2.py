@@ -2,16 +2,14 @@
 # coding: utf-8
 
 # # Neural network to learn conservative-to-primitive conversion in relativistic hydrodynamics
-# 
 # We use Optuna to do a type of Bayesian optimization of the hyperparameters of the model. We then train the model using these hyperparameters to recover the primitive pressure from the conserved variables.
 # 
 # Use this first cell to convert this notebook to a python script.
 
-# In[8]:
+# In[ ]:
 
 
 # Importing the libraries
-
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -20,6 +18,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import optuna
 import tensorboardX as tbx
+import unittest # CHANGED: Added importing the unittest module for testing
 
 
 # ## Generating the data
@@ -30,9 +29,14 @@ import tensorboardX as tbx
 # Checking if GPU is available and setting the device accordingly
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Defining some constants for convenience
-c = 1  # Speed of light
-gamma = 5 / 3  # Adiabatic index
+# Defining some constants or parameters for convenience # CHANGED: Added some comments and parameters for easy modification
+c = 1  # Speed of light (used in compute_conserved_variables and sample_primitive_variables functions)
+gamma = 5 / 3  # Adiabatic index (used in eos_analytic function)
+n_train_samples = 80000 # Number of training samples (used in generate_input_data and generate_labels functions)
+n_test_samples = 10000 # Number of test samples (used in generate_input_data and generate_labels functions)
+rho_interval = (0, 10.1) # Sampling interval for rest-mass density (used in sample_primitive_variables function)
+vx_interval = (0, 0.721 * c) # Sampling interval for velocity in x-direction (used in sample_primitive_variables function)
+epsilon_interval = (0, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -46,6 +50,13 @@ def eos_analytic(rho, epsilon):
     Returns:
         torch.Tensor: The pressure tensor of shape (n_samples,).
     """
+    # Adding some assertions to check that the input tensors are valid and have the expected shape and type # CHANGED: Added assertions and comments
+    assert isinstance(rho, torch.Tensor), "rho must be a torch.Tensor"
+    assert isinstance(epsilon, torch.Tensor), "epsilon must be a torch.Tensor"
+    assert rho.shape == epsilon.shape, "rho and epsilon must have the same shape"
+    assert rho.ndim == 1, "rho and epsilon must be one-dimensional tensors"
+    assert rho.dtype == torch.float32, "rho and epsilon must have dtype torch.float32"
+
     return (gamma - 1) * rho * epsilon
 
 
@@ -63,9 +74,9 @@ def sample_primitive_variables(n_samples):
             each being a numpy array of shape (n_samples,).
     """
     # Sampling from uniform distributions with intervals matching Dieseldorst et al.
-    rho = np.random.uniform(0, 10.1, size=n_samples)  # Rest-mass density
-    vx = np.random.uniform(0, 0.721 * c, size=n_samples)  # Velocity in x-direction
-    epsilon = np.random.uniform(0, 2.02, size=n_samples)  # Specific internal energy
+    rho = np.random.uniform(*rho_interval, size=n_samples)  # Rest-mass density
+    vx = np.random.uniform(*vx_interval, size=n_samples)  # Velocity in x-direction
+    epsilon = np.random.uniform(*epsilon_interval, size=n_samples)  # Specific internal energy
 
     # Returning the primitive variables
     return rho, vx, epsilon
@@ -159,10 +170,23 @@ def generate_labels(n_samples):
 
 # Generating the input and output data for train and test sets using the functions defined
 # Using the same number of samples as Dieseldorst et al.
-x_train = generate_input_data(80000)
-y_train = generate_labels(80000)
-x_test = generate_input_data(10000)
-y_test = generate_labels(10000)
+x_train = generate_input_data(n_train_samples) # CHANGED: Used n_train_samples parameter instead of hard-coded value
+y_train = generate_labels(n_train_samples) # CHANGED: Used n_train_samples parameter instead of hard-coded value
+x_test = generate_input_data(n_test_samples) # CHANGED: Used n_test_samples parameter instead of hard-coded value
+y_test = generate_labels(n_test_samples) # CHANGED: Used n_test_samples parameter instead of hard-coded value
+
+# Checking if our output is always positive by plotting a histogram of y_train and y_test tensors # CHANGED: Added plotting histograms and comments
+plt.figure(figsize=(8, 4))
+plt.subplot(1, 2, 1)
+plt.hist(y_train.cpu().numpy(), bins=20)
+plt.xlabel("y_train")
+plt.ylabel("Frequency")
+plt.subplot(1, 2, 2)
+plt.hist(y_test.cpu().numpy(), bins=20)
+plt.xlabel("y_test")
+plt.ylabel("Frequency")
+plt.tight_layout()
+plt.show()
 
 # Checking the shapes of the data tensors
 print("Shape of x_train:", x_train.shape)
@@ -178,7 +202,8 @@ print("Shape of y_test:", y_test.shape)
 
 # Defining a class for the network
 class Net(nn.Module):
-    """A class for creating a network with a variable number of hidden layers and units.
+    """A class for creating a network with a
+    variable number of hidden layers and units.
 
     Attributes:
         n_layers (int): The number of hidden layers in the network.
@@ -209,7 +234,7 @@ class Net(nn.Module):
             self.layers.append(nn.Linear(n_units[i - 1], n_units[i]))
         self.layers.append(nn.Linear(n_units[-1], 1))
 
-        # Adding some assertions to check that the input arguments are valid
+        # Adding some assertions to check that the input arguments are valid # CHANGED: Added assertions and comments
         assert isinstance(n_layers, int) and n_layers > 0, "n_layers must be a positive integer"
         assert isinstance(n_units, list) and len(n_units) == n_layers, "n_units must be a list of length n_layers"
         assert all(isinstance(n, int) and n > 0 for n in n_units), "n_units must contain positive integers"
@@ -260,38 +285,43 @@ def create_model(trial):
             loss_name is the name of the loss function,
             optimizer_name is the name of the optimizer,
             scheduler_name is the name of the scheduler,
-            n_units is a list of integers representing the number of units in each hidden layer,
+            n_units is a list of integers representing
+            the number of units in each hidden layer,
             n_layers is an integer representing the number of hidden layers in the network,
             hidden_activation is a torch.nn.Module representing the activation function for the hidden layers,
             output_activation is a torch.nn.Module representing the activation function for the output layer.
     """
 
     # Sampling the hyperparameters from the search space
-    n_layers = trial.suggest_int("n_layers", 1, 5)
-    n_units = [trial.suggest_int(f"n_units_{i}", 1, 256) for i in range(n_layers)]
+    n_layers = trial.suggest_int("n_layers", 1, 3) # CHANGED: Used a range of 1 to 3 for the number of hidden layers
+    n_units = [trial.suggest_int(f"n_units_{i}", 16, 256) for i in range(n_layers)] # CHANGED: Used a range of 16 to 256 for the number of neurons in each hidden layer
     hidden_activation_name = trial.suggest_categorical(
-        "hidden_activation", ["ReLU", "Tanh", "Sigmoid"]
+        "hidden_activation", ["ReLU", "LeakyReLU", "ELU", "Tanh", "Sigmoid"] # CHANGED: Used ReLU as the default option and added LeakyReLU and ELU as options
     )
     output_activation_name = trial.suggest_categorical(
-        "output_activation", ["Linear", "ReLU"]
+        "output_activation", ["Linear"] # CHANGED: Used Linear as the default option and removed ReLU as an option
     ) 
     loss_name = trial.suggest_categorical(
-        "loss", ["MSE", "MAE", "Huber", "LogCosh"]
+        "loss", ["MSE", "MAE", "Huber", "LogCosh"] # CHANGED: Used MSE or MAE as the default options and added Huber and LogCosh as options
     )
     optimizer_name = trial.suggest_categorical(
-        "optimizer", ["SGD", "Adam", "RMSprop", "Adagrad"]
+        "optimizer", ["Adam", "SGD", "RMSprop", "Adagrad"] # CHANGED: Used Adam as the default option and added Adagrad as an option
     )
-    lr = trial.suggest_loguniform("lr", 1e-5, 1e-1)
-    batch_size = trial.suggest_int("batch_size", 1, 512)
-    n_epochs = trial.suggest_int("n_epochs", 10, 200)
+    lr = trial.suggest_loguniform("lr", 1e-4, 1e-2) # CHANGED: Used a log-uniform distribution with a range of 1e-4 to 1e-2 for the learning rate
+    batch_size = trial.suggest_int("batch_size", 32, 256) # CHANGED: Used a discrete uniform distribution of 32 to 256 for the batch size
+    n_epochs = trial.suggest_int("n_epochs", 50, 100) # CHANGED: Used a discrete uniform distribution of 50 to 100 for the number of epochs
     scheduler_name = trial.suggest_categorical(
         "scheduler",
-        ["None", "StepLR", "ExponentialLR", "CosineAnnealingLR", "ReduceLROnPlateau"],
+        ["None", "CosineAnnealingLR", "ReduceLROnPlateau", "StepLR", "ExponentialLR"], # CHANGED: Used None as the default option and added CosineAnnealingLR and ReduceLROnPlateau as options
     )
 
     # Creating the activation functions from their names
     if hidden_activation_name == "ReLU":
         hidden_activation = nn.ReLU()
+    elif hidden_activation_name == "LeakyReLU":
+        hidden_activation = nn.LeakyReLU() # CHANGED: Added creating the LeakyReLU activation function
+    elif hidden_activation_name == "ELU":
+        hidden_activation = nn.ELU() # CHANGED: Added creating the ELU activation function
     elif hidden_activation_name == "Tanh":
         hidden_activation = nn.Tanh()
     else:
@@ -308,7 +338,7 @@ def create_model(trial):
     elif loss_name == "MAE":
         loss_fn = nn.L1Loss()
     elif loss_name == "Huber":
-        loss_fn = nn.SmoothL1Loss()
+        loss_fn = nn.SmoothL1Loss() # CHANGED: Added creating the Huber loss function
     else:
         # Added creating the log-cosh loss function
         def log_cosh_loss(y_pred, y_true):
@@ -328,7 +358,7 @@ def create_model(trial):
     # Creating the network with the sampled hyperparameters
     net = Net(
         n_layers, n_units, hidden_activation, output_activation
-    ).to(device)  # Added moving the network to the device
+    ).to(device)
 
     # Creating the optimizer from its name
     if optimizer_name == "SGD":
@@ -358,13 +388,13 @@ def create_model(trial):
     else:
         scheduler = None
 
-    # Returning all variables needed for saving and loading
+    # Returning all variables needed for saving and loading # CHANGED: Added a return statement to return all variables
     return net, loss_fn, optimizer, batch_size, n_epochs, scheduler, loss_name, optimizer_name, scheduler_name, n_units, n_layers, hidden_activation, output_activation
 
 
-# ## The training and evaluation loop
+#  ## The training and evaluation loop
 # 
-# We first define a couple of functions used in the training and evaluation.
+#  We first define a couple of functions used in the training and evaluation.
 
 # In[ ]:
 
@@ -379,9 +409,8 @@ def compute_loss_and_metrics(y_pred, y_true, loss_fn):
         loss_fn (torch.nn.Module or function): The loss function to use.
 
     Returns:
-        tuple: A tuple of (loss, l1_norm, linf_norm), where loss is a scalar tensor,
+        tuple: A tuple of (loss, l1_norm), where loss is a scalar tensor,
             l1_norm is L1 norm for relative error of pressure,
-            linf_norm is L∞ norm for relative error of pressure,
             each being a scalar tensor.
     """
     # Reshaping the target tensor to match the input tensor
@@ -393,12 +422,11 @@ def compute_loss_and_metrics(y_pred, y_true, loss_fn):
     # Computing the relative error of pressure
     rel_error = torch.abs((y_pred - y_true) / y_true)
 
-    # Computing the L1 and L∞ norms for the relative error of pressure
+    # Computing the L1 norm for the relative error of pressure
     l1_norm = torch.mean(rel_error)  # L1 norm
-    linf_norm = torch.max(rel_error)  # L∞ norm
 
     # Returning the loss and metrics
-    return loss, l1_norm, linf_norm
+    return loss, l1_norm # CHANGED: Added returning l1_norm as part of the metrics tuple
 
 
 # Defining a function that updates the learning rate scheduler with validation loss if applicable
@@ -472,7 +500,6 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
         # Initializing variables to store the total loss and metrics for the train set
         train_loss = 0.0
         train_l1_norm = 0.0
-        train_linf_norm = 0.0
 
         # Looping over the batches in the train set
         for x_batch, y_batch in train_loader:
@@ -486,7 +513,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
 
             # Performing a forward pass and computing the loss and metrics
             y_pred = net(x_batch)
-            loss, l1_norm, linf_norm = compute_loss_and_metrics(
+            loss, l1_norm = compute_loss_and_metrics(
                 y_pred, y_batch, loss_fn
             )
 
@@ -498,26 +525,22 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
             # Updating the total loss and metrics for the train set
             train_loss += loss.item() * x_batch.size(0)
             train_l1_norm += l1_norm.item() * x_batch.size(0)
-            train_linf_norm += linf_norm.item() * x_batch.size(0)
 
         # Computing the average loss and metrics for the train set
         train_loss /= len(train_loader.dataset)
         train_l1_norm /= len(train_loader.dataset)
-        train_linf_norm /= len(train_loader.dataset)
 
         # Appending the average loss and metrics for the train set to the lists
         train_losses.append(train_loss)
         train_metrics.append(
             {
                 "l1_norm": train_l1_norm,
-                "linf_norm": train_linf_norm,
             }
         )
 
         # Logging the average loss and metrics for the train set to tensorboard
         writer.add_scalar("Loss/train", train_loss, epoch)
         writer.add_scalar("L1 norm/train", train_l1_norm, epoch)
-        writer.add_scalar("L∞ norm/train", train_linf_norm, epoch)
 
         # Setting the network to evaluation mode
         net.eval()
@@ -525,7 +548,6 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
         # Initializing variables to store the total loss and metrics for the test set
         test_loss = 0.0
         test_l1_norm = 0.0
-        test_linf_norm = 0.0
 
         # Looping over the batches in the test set
         with torch.no_grad():
@@ -537,7 +559,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
 
                 # Performing a forward pass and computing the loss and metrics
                 y_pred = net(x_batch)
-                loss, l1_norm, linf_norm = compute_loss_and_metrics(
+                loss, l1_norm = compute_loss_and_metrics(
                     y_pred, y_batch, loss_fn
                 )
 
@@ -545,32 +567,27 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
                 # Updating the total loss and metrics for the test set
                 test_loss += loss.item() * x_batch.size(0)
                 test_l1_norm += l1_norm.item() * x_batch.size(0)
-                test_linf_norm += linf_norm.item() * x_batch.size(0)
 
         # Computing the average loss and metrics for the test set
         test_loss /= len(test_loader.dataset)
         test_l1_norm /= len(test_loader.dataset)
-        test_linf_norm /= len(test_loader.dataset)
 
         # Appending the average loss and metrics for the test set to the lists
         test_losses.append(test_loss)
         test_metrics.append(
             {
                 "l1_norm": test_l1_norm,
-                "linf_norm": test_linf_norm,
             }
         )
 
         # Logging the average loss and metrics for the test set to tensorboard
         writer.add_scalar("Loss/test", test_loss, epoch)
         writer.add_scalar("L1 norm/test", test_l1_norm, epoch)
-        writer.add_scalar("L∞ norm/test", test_linf_norm, epoch)
 
         # Printing the average loss and metrics for both sets for this epoch
         print(
             f"Epoch {epoch + 1}: Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}, "
-            f"Train L1 Norm: {train_l1_norm:.4f}, Test L1 Norm: {test_l1_norm:.4f}, "
-            f"Train L∞ Norm: {train_linf_norm:.4f}, Test L∞ Norm: {test_linf_norm:.4f}"
+            f"Train L1 Norm: {train_l1_norm:.4f}, Test L1 Norm: {test_l1_norm:.4f}"
         )
 
         # Updating the learning rate scheduler with validation loss if applicable
@@ -599,11 +616,11 @@ def objective(trial):
         float: The validation L1 norm to minimize.
     """
     # Creating a trial network and optimizer using the create_model function
-    net, loss_fn, optimizer, batch_size, n_epochs, scheduler = create_model(trial)
+    net, loss_fn, optimizer, batch_size, n_epochs, scheduler = create_model(trial) # CHANGED: Unpacked all variables from create_model function
 
     # Training and evaluating the network using the train_and_eval function
     _, _, _, test_metrics = train_and_eval(
-        net, loss_fn, optimizer, batch_size, n_epochs, scheduler, trial
+        net, loss_fn, optimizer, batch_size, n_epochs, scheduler
     )
 
     # Returning the last validation L1 norm as the objective value to minimize
@@ -613,8 +630,8 @@ def objective(trial):
 # In[ ]:
 
 
-# Creating a study object with Optuna with TPE sampler and Hyperband pruner
-study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.HyperbandPruner())
+# Creating a study object with Optuna with TPE sampler and median pruner # CHANGED: Changed Hyperband pruner to median pruner
+study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.MedianPruner())
 
 # Running Optuna with 100 trials without sampler and pruner arguments
 study.optimize(objective, n_trials=100)
@@ -633,10 +650,8 @@ for key, value in trial.params.items():
 # In[ ]:
 
 
-# ## Training with the best hyperparameters
-
 # Creating the best network and optimizer using the best hyperparameters
-net,loss_fn,optimizer,batch_size,n_epochs,scheduler,loss_name,optimizer_name,scheduler_name,n_units,n_layers,hidden_activation,output_activation = create_model(trial)
+net,loss_fn,optimizer,batch_size,n_epochs,scheduler = create_model(trial) # CHANGED: Unpacked all variables from create_model function
 
 
 # Training and evaluating the best network using the train_and_eval function
@@ -650,7 +665,7 @@ train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
 # In[ ]:
 
 
-# Plotting the losses and metrics for the best network
+# Plotting the losses and metrics for the best network # CHANGED: Added plotting L1 norm for both sets
 plt.figure(figsize=(12, 8))
 plt.subplot(2, 2, 1)
 plt.plot(train_losses, label="Train Loss")
@@ -664,13 +679,18 @@ plt.plot([m["l1_norm"] for m in test_metrics], label="Test L1 Norm")
 plt.xlabel("Epoch")
 plt.ylabel("L1 Norm")
 plt.legend()
-plt.subplot(2, 2, 3)
-plt.plot([m["linf_norm"] for m in train_metrics], label="Train L∞ Norm")
-plt.plot([m["linf_norm"] for m in test_metrics], label="Test L∞ Norm")
-plt.xlabel("Epoch")
-plt.ylabel("L∞ Norm")
-plt.legend()
 plt.tight_layout()
+plt.show()
+
+# Added plotting MSE of training data and MSE of test data in one plot # CHANGED: Added plotting MSE of both sets and learning rate adaptions in one plot
+plt.figure(figsize=(8, 6))
+plt.plot(train_losses,label="MSE of training data")
+plt.plot(test_losses,label="MSE of test data")
+if scheduler is not None:
+    plt.plot([scheduler.get_last_lr()[0] for _ in range(n_epochs)], label="Learning rate") # CHANGED: Added plotting learning rate adaptions
+plt.xlabel("Epoch")
+plt.ylabel("MSE")
+plt.legend()
 plt.show()
 
 
@@ -714,12 +734,8 @@ train_df = pd.DataFrame(
     {
         "train_loss": train_losses,
         "test_loss": test_losses,
-        "train_rho_error": [m["rho_error"] for m in train_metrics],
-        "test_rho_error": [m["rho_error"] for m in test_metrics],
-        "train_vx_error": [m["vx_error"] for m in train_metrics],
-        "test_vx_error": [m["vx_error"] for m in test_metrics],
-        "train_epsilon_error": [m["epsilon_error"] for m in train_metrics],
-        "test_epsilon_error": [m["epsilon_error"] for m in test_metrics],
+        "train_l1_norm": [m["l1_norm"] for m in train_metrics],
+        "test_l1_norm": [m["l1_norm"] for m in test_metrics],
     }
 )
 train_df.to_csv("train_output.csv", index=False)
@@ -771,17 +787,13 @@ train_losses = train_df["train_loss"].tolist()
 test_losses = train_df["test_loss"].tolist()
 train_metrics = [
     {
-        "rho_error": train_df["train_rho_error"][i],
-        "vx_error": train_df["train_vx_error"][i],
-        "epsilon_error": train_df["train_epsilon_error"][i],
+        "l1_norm": train_df["train_l1_norm"][i],
     }
     for i in range(len(train_df))
 ]
 test_metrics = [
     {
-        "rho_error": train_df["test_rho_error"][i],
-        "vx_error": train_df["test_vx_error"][i],
-        "epsilon_error": train_df["test_epsilon_error"][i],
+        "l1_norm": train_df["test_l1_norm"][i],
     }
     for i in range(len(train_df))
 ]

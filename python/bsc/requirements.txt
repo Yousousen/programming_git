@@ -1,6 +1,12 @@
 ipython
+ipykernel
+ipywidgets
+jupyter
+ipython_unittest
+numpy
 pandas
 matplotlib
 torch
 optuna
 tensorboard
+tensorboardX
