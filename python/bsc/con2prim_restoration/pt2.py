@@ -42,15 +42,6 @@ np.random.seed(0)
 
 # Defining an analytic equation of state (EOS) for an ideal gas
 def eos_analytic(rho, epsilon):
-    """Computes the pressure from rest-mass density and specific internal energy using an analytic EOS.
-
-    Args:
-        rho (torch.Tensor): The rest-mass density tensor of shape (n_samples,).
-        epsilon (torch.Tensor): The specific internal energy tensor of shape (n_samples,).
-
-    Returns:
-        torch.Tensor: The pressure tensor of shape (n_samples,).
-    """
     # Adding some assertions to check that the input tensors are valid and have the expected shape and type 
     assert isinstance(rho, torch.Tensor), "rho must be a torch.Tensor"
     assert isinstance(epsilon, torch.Tensor), "epsilon must be a torch.Tensor"
@@ -63,17 +54,6 @@ def eos_analytic(rho, epsilon):
 
 # Defining a function that samples primitive variables from uniform distributions
 def sample_primitive_variables(n_samples):
-    """Samples primitive variables from uniform distributions.
-
-    Args:
-        n_samples (int): The number of samples to generate.
-
-    Returns:
-        tuple: A tuple of (rho, vx, epsilon), where rho is rest-mass density,
-            vx is velocity in x-direction,
-            epsilon is specific internal energy,
-            each being a numpy array of shape (n_samples,).
-    """
     # Sampling from uniform distributions with intervals matching Dieseldorst et al.
     rho = np.random.uniform(*rho_interval, size=n_samples)  # Rest-mass density
     vx = np.random.uniform(*vx_interval, size=n_samples)  # Velocity in x-direction
@@ -85,19 +65,6 @@ def sample_primitive_variables(n_samples):
 
 # Defining a function that computes conserved variables from primitive variables
 def compute_conserved_variables(rho, vx, epsilon):
-    """Computes conserved variables from primitive variables.
-
-    Args:
-        rho (torch.Tensor): The rest-mass density tensor of shape (n_samples,).
-        vx (torch.Tensor): The velocity in x-direction tensor of shape (n_samples,).
-        epsilon (torch.Tensor): The specific internal energy tensor of shape (n_samples,).
-
-    Returns:
-        tuple: A tuple of (D, Sx, tau), where D is conserved density,
-            Sx is conserved momentum in x-direction,
-            tau is conserved energy density,
-            each being a torch tensor of shape (n_samples,).
-    """
 
     # Computing the pressure from the primitive variables using the EOS
     p = eos_analytic(rho, epsilon)
@@ -117,14 +84,6 @@ def compute_conserved_variables(rho, vx, epsilon):
 
 # Defining a function that generates input data (conserved variables) from random samples of primitive variables
 def generate_input_data(n_samples):
-    """Generates input data (conserved variables) from random samples of primitive variables.
-
-    Args:
-        n_samples (int): The number of samples to generate.
-
-    Returns:
-        torch.Tensor: The input data tensor of shape (n_samples, 3).
-    """
     # Sampling the primitive variables using the sample_primitive_variables function
     rho, vx, epsilon = sample_primitive_variables(n_samples)
 
@@ -144,14 +103,6 @@ def generate_input_data(n_samples):
 
 # Defining a function that generates output data (labels) from random samples of primitive variables
 def generate_labels(n_samples):
-    """Generates output data (labels) from random samples of primitive variables.
-
-    Args:
-        n_samples (int): The number of samples to generate.
-
-    Returns:
-        torch.Tensor: The output data tensor of shape (n_samples,).
-    """
     # Sampling the primitive variables using the sample_primitive_variables function
     rho, _, epsilon = sample_primitive_variables(n_samples)
 
@@ -203,26 +154,8 @@ print("Shape of y_test:", y_test.shape)
 
 # Defining a class for the network
 class Net(nn.Module):
-    """A class for creating a network with a
-    variable number of hidden layers and units.
-
-    Attributes:
-        n_layers (int): The number of hidden layers in the network.
-        n_units (list): A list of integers representing the number of units in each hidden layer.
-        hidden_activation (torch.nn.Module): The activation function for the hidden layers.
-        output_activation (torch.nn.Module): The activation function for the output layer.
-        layers (torch.nn.ModuleList): A list of linear layers in the network.
-    """
 
     def __init__(self, n_layers, n_units, hidden_activation, output_activation):
-        """Initializes the network with the given hyperparameters.
-
-        Args:
-            n_layers (int): The number of hidden layers in the network.
-            n_units (list): A list of integers representing the number of units in each hidden layer.
-            hidden_activation (torch.nn.Module): The activation function for the hidden layers.
-            output_activation (torch.nn.Module): The activation function for the output layer.
-        """
         super().__init__()
         self.n_layers = n_layers
         self.n_units = n_units
@@ -243,14 +176,6 @@ class Net(nn.Module):
         assert isinstance(output_activation, nn.Module), "output_activation must be a torch.nn.Module"
 
     def forward(self, x):
-        """Performs a forward pass on the input tensor.
-
-        Args:
-            x (torch.Tensor): The input tensor of shape (batch_size, 3).
-
-        Returns:
-            torch.Tensor: The output tensor of shape (batch_size, 1).
-        """
         # Looping over the hidden layers and applying the linear transformation and the activation function
         for layer in self.layers[:-1]:
             x = self.hidden_activation(layer(x))
@@ -268,30 +193,6 @@ class Net(nn.Module):
 
 # Defining a function to create a trial network and optimizer
 def create_model(trial):
-    """Creates a trial network and optimizer based on the sampled hyperparameters.
-
-    Args:
-        trial (optuna.trial.Trial): The trial object that contains the hyperparameters.
-
-    Returns:
-        tuple: A tuple of (net, loss_fn, optimizer, batch_size, n_epochs,
-            scheduler, loss_name, optimizer_name, scheduler_name,
-            n_units, n_layers, hidden_activation, output_activation),
-            where net is the trial network,
-            loss_fn is the loss function,
-            optimizer is the optimizer,
-            batch_size is the batch size,
-            n_epochs is the number of epochs,
-            scheduler is the learning rate scheduler,
-            loss_name is the name of the loss function,
-            optimizer_name is the name of the optimizer,
-            scheduler_name is the name of the scheduler,
-            n_units is a list of integers representing
-            the number of units in each hidden layer,
-            n_layers is an integer representing the number of hidden layers in the network,
-            hidden_activation is a torch.nn.Module representing the activation function for the hidden layers,
-            output_activation is a torch.nn.Module representing the activation function for the output layer.
-    """
 
     # Sampling the hyperparameters from the search space
     n_layers = trial.suggest_int("n_layers", 1, 3)
@@ -343,15 +244,6 @@ def create_model(trial):
     else:
         # Creating the log-cosh loss function
         def log_cosh_loss(y_pred, y_true):
-            """Computes the log-cosh loss between the predicted and true values.
-
-            Args:
-                y_pred (torch.Tensor): The predicted values tensor of shape (batch_size, 1).
-                y_true (torch.Tensor): The true values tensor of shape (batch_size, 1).
-
-            Returns:
-                torch.Tensor: The log-cosh loss tensor of shape ().
-            """
             return torch.mean(torch.log(torch.cosh(y_pred - y_true)))
             
         loss_fn = log_cosh_loss
@@ -402,19 +294,6 @@ def create_model(trial):
 
 # Defining a function that computes loss and metrics for a given batch
 def compute_loss_and_metrics(y_pred, y_true, loss_fn):
-    """Computes loss and metrics for a given batch.
-
-    Args:
-        y_pred (torch.Tensor): The predicted pressure tensor of shape (batch_size, 1).
-        y_true (torch.Tensor): The true pressure tensor of shape (batch_size,).
-        loss_fn (torch.nn.Module or function): The loss function to use.
-
-    Returns:
-        tuple: A tuple of (loss, l1_norm), where loss is a scalar tensor,
-            l1_norm is L1 norm for relative error of pressure,
-            each being a scalar tensor.
-            linf_norm is Linf norm for relative error of pressure.
-    """
     # Reshaping the target tensor to match the input tensor
     y_true = y_true.view(-1, 1)
 
@@ -435,15 +314,6 @@ def compute_loss_and_metrics(y_pred, y_true, loss_fn):
 
 # Defining a function that updates the learning rate scheduler with validation loss if applicable
 def update_scheduler(scheduler, test_loss):
-    """Updates the learning rate scheduler with validation loss if applicable.
-
-    Args:
-        scheduler (torch.optim.lr_scheduler._LRScheduler or None): The learning rate scheduler to use.
-        test_loss (float): The validation loss to use.
-
-    Returns:
-        None
-    """
     # Checking if scheduler is not None
     if scheduler is not None:
         # Checking if scheduler is ReduceLROnPlateau
@@ -462,22 +332,6 @@ def update_scheduler(scheduler, test_loss):
 
 # Defining a function to train and evaluate a network
 def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, trial=None):
-    """Trains and evaluates a network.
-
-    Args:
-        net (torch.nn.Module): The network to train and evaluate.
-        loss_fn (torch.nn.Module or function): The loss function.
-        optimizer (torch.optim.Optimizer): The optimizer.
-        batch_size (int): The batch size.
-        n_epochs (int): The number of epochs.
-        scheduler (torch.optim.lr_scheduler._LRScheduler or None): The learning rate scheduler.
-    Returns:
-        tuple: A tuple of (train_losses, test_losses, train_metrics, test_metrics), where
-            train_losses is a list of training losses for each epoch,
-            test_losses is a list of validation losses for each epoch,
-            train_metrics is a list of dictionaries containing training metrics for each epoch,
-            test_metrics is a list of dictionaries containing validation metrics for each epoch.
-    """
     # Creating data loaders for train and test sets
     train_loader = torch.utils.data.DataLoader(
         torch.utils.data.TensorDataset(x_train, y_train), batch_size=batch_size, shuffle=True
@@ -630,14 +484,6 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
 # Defining an objective function for Optuna to minimize
 def objective(trial):
-    """Defines an objective function for Optuna to minimize.
-
-    Args:
-        trial (optuna.trial.Trial): The trial object that contains the hyperparameters.
-
-    Returns:
-        float: The validation L1 norm to minimize.
-    """
     # Creating a trial network and optimizer using the create_model function
     net, \
     loss_fn, \
