@@ -39,7 +39,7 @@ vx_interval = (0, 0.721 * c) # Sampling interval for velocity in x-direction (us
 epsilon_interval = (0, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
 
 # Uncomment for pseudorandom data.
-np.random.seed(0)
+np.random.seed(1)
 
 # Defining an analytic equation of state (EOS) for an ideal gas
 def eos_analytic(rho, epsilon):
@@ -329,7 +329,7 @@ def create_model(trial, optimize):
         optimizer_name = "Adam"
         lr = 6e-4
         batch_size = 32
-        n_epochs = 100
+        n_epochs = 400
         scheduler_name = "ReduceLROnPlateau"
 
     # Creating the activation functions from their names
@@ -765,10 +765,10 @@ plt.show()
 
 # Added plotting MSE of training data and MSE of test data in one plot 
 plt.figure(figsize=(8, 6))
-plt.plot(train_losses,label="MSE of training data")
-plt.plot(test_losses,label="MSE of test data")
-if scheduler is not None:
-    plt.plot([scheduler.get_last_lr()[0] for _ in range(n_epochs)], label="Learning rate") 
+plt.plot(train_losses,label="training data")
+plt.plot(test_losses,label="test data")
+#if scheduler is not None:
+#    plt.plot([scheduler.get_last_lr()[0] for _ in range(n_epochs)], label="Learning rate") 
 plt.xlabel("Epoch")
 plt.ylabel("MSE")
 plt.legend()
@@ -829,57 +829,5 @@ train_df.to_csv("train_output.csv", index=False)
 # In[ ]:
 
 
-## Loading the best network state dictionary using torch.load
-state_dict = torch.load("best_net.pth")
-
-# Loading the state dictionary into a new network instance using net.load_state_dict
-new_net = Net(n_layers, n_units, hidden_activation, output_activation).to(device)
-new_net.load_state_dict(state_dict)
-
-
-# In[ ]:
-
-
-# Loading the loss function name using pickle
-with open("loss_fn.pkl", "rb") as f:
-    loss_name = pickle.load(f)
-
-# Loading the optimizer name and parameters using pickle
-with open("optimizer.pkl", "rb") as f:
-    optimizer_name, optimizer_state_dict = pickle.load(f)
-
-# Loading the best number of epochs using pickle
-with open("n_epochs.pkl", "rb") as f:
-    n_epochs = pickle.load(f)
-
-# Loading the scheduler name and parameters using pickle
-with open("scheduler.pkl", "rb") as f:
-    scheduler_name, scheduler_state_dict = pickle.load(f)
-
-# Loading the number of units for each hidden layer using pickle
-with open("n_units.pkl", "rb") as f:
-    n_units = pickle.load(f)
-
-# Loading the output of create_model using pickle
-with open("create_model.pkl", "rb") as f:
-    net, loss_fn, optimizer, batch_size, n_epochs, scheduler = pickle.load(f)
-
-# Loading the output of the training using pandas
-train_df = pd.read_csv("train_output.csv")
-train_losses = train_df["train_loss"].tolist()
-test_losses = train_df["test_loss"].tolist()
-train_metrics = [
-    {
-        "l1_norm": train_df["train_l1_norm"][i],
-        "linf_norm": train_df["train_linf_norm"][i],
-    }
-    for i in range(len(train_df))
-]
-test_metrics = [
-    {
-        "l1_norm": train_df["test_l1_norm"][i],
-        "linf_norm": train_df["test_linf_norm"][i],
-    }
-    for i in range(len(train_df))
-]
+get_ipython().run_cell_magic('script', 'echo skipping', '\n## Loading the best network state dictionary using torch.load\nstate_dict = torch.load("best_net.pth")\n\n# Loading the state dictionary into a new network instance using net.load_state_dict\nnew_net = Net(n_layers, n_units, hidden_activation, output_activation).to(device)\nnew_net.load_state_dict(state_dict)\n\n\n# In[ ]:\n\n\n# Loading the loss function name using pickle\nwith open("loss_fn.pkl", "rb") as f:\n    loss_name = pickle.load(f)\n\n# Loading the optimizer name and parameters using pickle\nwith open("optimizer.pkl", "rb") as f:\n    optimizer_name, optimizer_state_dict = pickle.load(f)\n\n# Loading the best number of epochs using pickle\nwith open("n_epochs.pkl", "rb") as f:\n    n_epochs = pickle.load(f)\n\n# Loading the scheduler name and parameters using pickle\nwith open("scheduler.pkl", "rb") as f:\n    scheduler_name, scheduler_state_dict = pickle.load(f)\n\n# Loading the number of units for each hidden layer using pickle\nwith open("n_units.pkl", "rb") as f:\n    n_units = pickle.load(f)\n\n# Loading the output of create_model using pickle\nwith open("create_model.pkl", "rb") as f:\n    net, loss_fn, optimizer, batch_size, n_epochs, scheduler = pickle.load(f)\n\n# Loading the output of the training using pandas\ntrain_df = pd.read_csv("train_output.csv")\ntrain_losses = train_df["train_loss"].tolist()\ntest_losses = train_df["test_loss"].tolist()\ntrain_metrics = [\n    {\n        "l1_norm": train_df["train_l1_norm"][i],\n        "linf_norm": train_df["train_linf_norm"][i],\n    }\n    for i in range(len(train_df))\n]\ntest_metrics = [\n    {\n        "l1_norm": train_df["test_l1_norm"][i],\n        "linf_norm": train_df["test_linf_norm"][i],\n    }\n    for i in range(len(train_df))\n]\n')
 
