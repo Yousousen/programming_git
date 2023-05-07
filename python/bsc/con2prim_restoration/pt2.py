@@ -351,7 +351,7 @@ def create_model(trial):
             Returns:
                 torch.Tensor: The log-cosh loss tensor of shape ().
             """
-            return torch.mean(F.log_cosh(y_pred - y_true))
+            return torch.mean(torch.log(torch.cosh(y_pred - y_true)))
             
         loss_fn = log_cosh_loss
 
