@@ -299,7 +299,7 @@ def create_model(trial):
         "hidden_activation", ["ReLU", "LeakyReLU", "ELU", "Tanh", "Sigmoid"] # CHANGED: Used ReLU as the default option and added LeakyReLU and ELU as options
     )
     output_activation_name = trial.suggest_categorical(
-        "output_activation", ["Linear"] # CHANGED: Used Linear as the default option and removed ReLU as an option
+        "output_activation", ["Linear", "ReLU"]
     ) 
     loss_name = trial.suggest_categorical(
         "loss", ["MSE", "MAE", "Huber", "LogCosh"] # CHANGED: Used MSE or MAE as the default options and added Huber and LogCosh as options
@@ -412,6 +412,7 @@ def compute_loss_and_metrics(y_pred, y_true, loss_fn):
         tuple: A tuple of (loss, l1_norm), where loss is a scalar tensor,
             l1_norm is L1 norm for relative error of pressure,
             each being a scalar tensor.
+            linf_norm is Linf norm for relative error of pressure.
     """
     # Reshaping the target tensor to match the input tensor
     y_true = y_true.view(-1, 1)
@@ -423,10 +424,12 @@ def compute_loss_and_metrics(y_pred, y_true, loss_fn):
     rel_error = torch.abs((y_pred - y_true) / y_true)
 
     # Computing the L1 norm for the relative error of pressure
-    l1_norm = torch.mean(rel_error)  # L1 norm
+    l1_norm = torch.mean(rel_error) 
+    # Computing the Linf norm for the relative error of pressure
+    linf_norm = torch.max(rel_error) 
 
     # Returning the loss and metrics
-    return loss, l1_norm # CHANGED: Added returning l1_norm as part of the metrics tuple
+    return loss, l1_norm, linf_norm
 
 
 # Defining a function that updates the learning rate scheduler with validation loss if applicable
@@ -457,7 +460,7 @@ def update_scheduler(scheduler, test_loss):
 
 
 # Defining a function to train and evaluate a network
-def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
+def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, trial=None):
     """Trains and evaluates a network.
 
     Args:
@@ -500,6 +503,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
         # Initializing variables to store the total loss and metrics for the train set
         train_loss = 0.0
         train_l1_norm = 0.0
+        train_linf_norm = 0.0
 
         # Looping over the batches in the train set
         for x_batch, y_batch in train_loader:
@@ -513,7 +517,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
 
             # Performing a forward pass and computing the loss and metrics
             y_pred = net(x_batch)
-            loss, l1_norm = compute_loss_and_metrics(
+            loss, l1_norm, linf_norm = compute_loss_and_metrics(
                 y_pred, y_batch, loss_fn
             )
 
@@ -525,22 +529,26 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
             # Updating the total loss and metrics for the train set
             train_loss += loss.item() * x_batch.size(0)
             train_l1_norm += l1_norm.item() * x_batch.size(0)
+            train_linf_norm += linf_norm.item() * x_batch.size(0)
 
         # Computing the average loss and metrics for the train set
         train_loss /= len(train_loader.dataset)
         train_l1_norm /= len(train_loader.dataset)
+        train_linf_norm /= len(train_loader.dataset)
 
         # Appending the average loss and metrics for the train set to the lists
         train_losses.append(train_loss)
         train_metrics.append(
             {
                 "l1_norm": train_l1_norm,
+                "linf_norm": train_linf_norm,
             }
         )
 
         # Logging the average loss and metrics for the train set to tensorboard
         writer.add_scalar("Loss/train", train_loss, epoch)
         writer.add_scalar("L1 norm/train", train_l1_norm, epoch)
+        writer.add_scalar("Linf norm/train", train_linf_norm, epoch)
 
         # Setting the network to evaluation mode
         net.eval()
@@ -548,6 +556,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
         # Initializing variables to store the total loss and metrics for the test set
         test_loss = 0.0
         test_l1_norm = 0.0
+        test_linf_norm = 0.0
 
         # Looping over the batches in the test set
         with torch.no_grad():
@@ -559,7 +568,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
 
                 # Performing a forward pass and computing the loss and metrics
                 y_pred = net(x_batch)
-                loss, l1_norm = compute_loss_and_metrics(
+                loss, l1_norm, linf_norm = compute_loss_and_metrics(
                     y_pred, y_batch, loss_fn
                 )
 
@@ -567,31 +576,44 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler):
                 # Updating the total loss and metrics for the test set
                 test_loss += loss.item() * x_batch.size(0)
                 test_l1_norm += l1_norm.item() * x_batch.size(0)
+                test_linf_norm += linf_norm.item() * x_batch.size(0)
 
         # Computing the average loss and metrics for the test set
         test_loss /= len(test_loader.dataset)
         test_l1_norm /= len(test_loader.dataset)
+        test_linf_norm /= len(test_loader.dataset)
 
         # Appending the average loss and metrics for the test set to the lists
         test_losses.append(test_loss)
         test_metrics.append(
             {
                 "l1_norm": test_l1_norm,
+                "linf_norm": test_linf_norm,
             }
         )
 
         # Logging the average loss and metrics for the test set to tensorboard
         writer.add_scalar("Loss/test", test_loss, epoch)
         writer.add_scalar("L1 norm/test", test_l1_norm, epoch)
+        writer.add_scalar("Linf norm/test", test_linf_norm, epoch)
 
         # Printing the average loss and metrics for both sets for this epoch
         print(
             f"Epoch {epoch + 1}: Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}, "
-            f"Train L1 Norm: {train_l1_norm:.4f}, Test L1 Norm: {test_l1_norm:.4f}"
+            f"Train L1 Norm: {train_l1_norm:.4f}, Test L1 Norm: {test_l1_norm:.4f}, "
+            f"Train Linf Norm: {train_linf_norm:.4f}, Test Linf Norm: {test_linf_norm:.4f}"
         )
 
         # Updating the learning rate scheduler with validation loss if applicable
         update_scheduler(scheduler, test_loss)
+
+        # Reporting the intermediate metric value to Optuna if trial is not None
+        if trial is not None:
+            trial.report(test_metrics[-1]["l1_norm"], epoch)
+
+            # Checking if the trial should be pruned based on the intermediate value if trial is not None
+            if trial.should_prune():
+                raise optuna.TrialPruned()
 
     # Closing the SummaryWriter object
     writer.close()
@@ -632,7 +654,7 @@ def objective(trial):
 
     # Training and evaluating the network using the train_and_eval function
     _, _, _, test_metrics = train_and_eval(
-        net, loss_fn, optimizer, batch_size, n_epochs, scheduler
+        net, loss_fn, optimizer, batch_size, n_epochs, scheduler, trial
     )
 
     # Returning the last validation L1 norm as the objective value to minimize
@@ -704,6 +726,12 @@ plt.plot([m["l1_norm"] for m in test_metrics], label="Test L1 Norm")
 plt.xlabel("Epoch")
 plt.ylabel("L1 Norm")
 plt.legend()
+plt.subplot(2, 2, 3)
+plt.plot([m["linf_norm"] for m in train_metrics], label="Train Linf Norm")
+plt.plot([m["linf_norm"] for m in test_metrics], label="Test Linf Norm")
+plt.xlabel("Epoch")
+plt.ylabel("Linf Norm")
+plt.legend()
 plt.tight_layout()
 plt.show()
 
@@ -761,6 +789,8 @@ train_df = pd.DataFrame(
         "test_loss": test_losses,
         "train_l1_norm": [m["l1_norm"] for m in train_metrics],
         "test_l1_norm": [m["l1_norm"] for m in test_metrics],
+        "train_linf_norm": [m["linf_norm"] for m in train_metrics],
+        "test_linf_norm": [m["linf_norm"] for m in test_metrics],
     }
 )
 train_df.to_csv("train_output.csv", index=False)
@@ -813,12 +843,14 @@ test_losses = train_df["test_loss"].tolist()
 train_metrics = [
     {
         "l1_norm": train_df["train_l1_norm"][i],
+        "linf_norm": train_df["train_linf_norm"][i],
     }
     for i in range(len(train_df))
 ]
 test_metrics = [
     {
         "l1_norm": train_df["test_l1_norm"][i],
+        "linf_norm": train_df["test_linf_norm"][i],
     }
     for i in range(len(train_df))
 ]
