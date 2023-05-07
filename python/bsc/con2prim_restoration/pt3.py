@@ -268,7 +268,7 @@ class Net(nn.Module):
 
 
 # Defining a function to create a trial network and optimizer
-def create_model(trial, optimize=True):
+def create_model(trial, optimize):
     """Creates a trial network and optimizer based on the sampled hyperparameters.
 
     Args:
@@ -329,7 +329,7 @@ def create_model(trial, optimize=True):
         optimizer_name = "Adam"
         lr = 6e-4
         batch_size = 32
-        n_epochs = 400
+        n_epochs = 100
         scheduler_name = "ReduceLROnPlateau"
 
     # Creating the activation functions from their names
@@ -711,7 +711,7 @@ if OPTIMIZE:
     n_units, \
     n_layers, \
     hidden_activation, \
-    output_activation = create_model(trial)
+    output_activation = create_model(trial, optimize=True)
 # Creating the network with predefined hyperparameters
 else:
     net, \
