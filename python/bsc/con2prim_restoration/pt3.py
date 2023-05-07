@@ -39,7 +39,7 @@ vx_interval = (0, 0.721 * c) # Sampling interval for velocity in x-direction (us
 epsilon_interval = (0, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
 
 # Uncomment for pseudorandom data.
-np.random.seed(0)
+np.random.seed(1)
 
 # Defining an analytic equation of state (EOS) for an ideal gas
 def eos_analytic(rho, epsilon):
