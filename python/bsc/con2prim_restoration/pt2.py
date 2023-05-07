@@ -6,7 +6,7 @@
 # 
 # Use this first cell to convert this notebook to a python script.
 
-# In[ ]:
+# In[2]:
 
 
 # Importing the libraries
@@ -18,18 +18,17 @@ import torch.optim as optim
 import torch.nn.functional as F
 import optuna
 import tensorboardX as tbx
-import unittest # CHANGED: Added importing the unittest module for testing
 
 
 # ## Generating the data
 
-# In[ ]:
+# In[11]:
 
 
 # Checking if GPU is available and setting the device accordingly
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Defining some constants or parameters for convenience # CHANGED: Added some comments and parameters for easy modification
+# Defining some constants or parameters for convenience
 c = 1  # Speed of light (used in compute_conserved_variables and sample_primitive_variables functions)
 gamma = 5 / 3  # Adiabatic index (used in eos_analytic function)
 n_train_samples = 80000 # Number of training samples (used in generate_input_data and generate_labels functions)
@@ -38,6 +37,8 @@ rho_interval = (0, 10.1) # Sampling interval for rest-mass density (used in samp
 vx_interval = (0, 0.721 * c) # Sampling interval for velocity in x-direction (used in sample_primitive_variables function)
 epsilon_interval = (0, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
 
+# Uncomment for pseudorandom data.
+np.random.seed(0)
 
 # Defining an analytic equation of state (EOS) for an ideal gas
 def eos_analytic(rho, epsilon):
@@ -50,7 +51,7 @@ def eos_analytic(rho, epsilon):
     Returns:
         torch.Tensor: The pressure tensor of shape (n_samples,).
     """
-    # Adding some assertions to check that the input tensors are valid and have the expected shape and type # CHANGED: Added assertions and comments
+    # Adding some assertions to check that the input tensors are valid and have the expected shape and type 
     assert isinstance(rho, torch.Tensor), "rho must be a torch.Tensor"
     assert isinstance(epsilon, torch.Tensor), "epsilon must be a torch.Tensor"
     assert rho.shape == epsilon.shape, "rho and epsilon must have the same shape"
@@ -165,17 +166,17 @@ def generate_labels(n_samples):
     return p
 
 
-# In[ ]:
+# In[12]:
 
 
 # Generating the input and output data for train and test sets using the functions defined
 # Using the same number of samples as Dieseldorst et al.
-x_train = generate_input_data(n_train_samples) # CHANGED: Used n_train_samples parameter instead of hard-coded value
-y_train = generate_labels(n_train_samples) # CHANGED: Used n_train_samples parameter instead of hard-coded value
-x_test = generate_input_data(n_test_samples) # CHANGED: Used n_test_samples parameter instead of hard-coded value
-y_test = generate_labels(n_test_samples) # CHANGED: Used n_test_samples parameter instead of hard-coded value
+x_train = generate_input_data(n_train_samples)
+y_train = generate_labels(n_train_samples) 
+x_test = generate_input_data(n_test_samples) 
+y_test = generate_labels(n_test_samples) 
 
-# Checking if our output is always positive by plotting a histogram of y_train and y_test tensors # CHANGED: Added plotting histograms and comments
+# Checking if our output is always positive by plotting a histogram of y_train and y_test tensors 
 plt.figure(figsize=(8, 4))
 plt.subplot(1, 2, 1)
 plt.hist(y_train.cpu().numpy(), bins=20)
@@ -197,7 +198,7 @@ print("Shape of y_test:", y_test.shape)
 
 # ## Defining the neural network
 
-# In[ ]:
+# In[5]:
 
 
 # Defining a class for the network
@@ -262,7 +263,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[ ]:
+# In[6]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -293,35 +294,35 @@ def create_model(trial):
     """
 
     # Sampling the hyperparameters from the search space
-    n_layers = trial.suggest_int("n_layers", 1, 3) # CHANGED: Used a range of 1 to 3 for the number of hidden layers
-    n_units = [trial.suggest_int(f"n_units_{i}", 16, 256) for i in range(n_layers)] # CHANGED: Used a range of 16 to 256 for the number of neurons in each hidden layer
+    n_layers = trial.suggest_int("n_layers", 1, 3)
+    n_units = [trial.suggest_int(f"n_units_{i}", 16, 256) for i in range(n_layers)] 
     hidden_activation_name = trial.suggest_categorical(
-        "hidden_activation", ["ReLU", "LeakyReLU", "ELU", "Tanh", "Sigmoid"] # CHANGED: Used ReLU as the default option and added LeakyReLU and ELU as options
+        "hidden_activation", ["ReLU", "LeakyReLU", "ELU", "Tanh", "Sigmoid"]
     )
     output_activation_name = trial.suggest_categorical(
         "output_activation", ["Linear", "ReLU"]
     ) 
     loss_name = trial.suggest_categorical(
-        "loss", ["MSE", "MAE", "Huber", "LogCosh"] # CHANGED: Used MSE or MAE as the default options and added Huber and LogCosh as options
+        "loss", ["MSE", "MAE", "Huber", "LogCosh"] 
     )
     optimizer_name = trial.suggest_categorical(
-        "optimizer", ["Adam", "SGD", "RMSprop", "Adagrad"] # CHANGED: Used Adam as the default option and added Adagrad as an option
+        "optimizer", ["Adam", "SGD", "RMSprop", "Adagrad"] 
     )
-    lr = trial.suggest_loguniform("lr", 1e-4, 1e-2) # CHANGED: Used a log-uniform distribution with a range of 1e-4 to 1e-2 for the learning rate
-    batch_size = trial.suggest_int("batch_size", 32, 256) # CHANGED: Used a discrete uniform distribution of 32 to 256 for the batch size
-    n_epochs = trial.suggest_int("n_epochs", 50, 100) # CHANGED: Used a discrete uniform distribution of 50 to 100 for the number of epochs
+    lr = trial.suggest_loguniform("lr", 1e-4, 1e-2) 
+    batch_size = trial.suggest_int("batch_size", 32, 256) #
+    n_epochs = trial.suggest_int("n_epochs", 50, 100) 
     scheduler_name = trial.suggest_categorical(
         "scheduler",
-        ["None", "CosineAnnealingLR", "ReduceLROnPlateau", "StepLR", "ExponentialLR"], # CHANGED: Used None as the default option and added CosineAnnealingLR and ReduceLROnPlateau as options
+        ["None", "CosineAnnealingLR", "ReduceLROnPlateau", "StepLR", "ExponentialLR"],
     )
 
     # Creating the activation functions from their names
     if hidden_activation_name == "ReLU":
         hidden_activation = nn.ReLU()
     elif hidden_activation_name == "LeakyReLU":
-        hidden_activation = nn.LeakyReLU() # CHANGED: Added creating the LeakyReLU activation function
+        hidden_activation = nn.LeakyReLU() 
     elif hidden_activation_name == "ELU":
-        hidden_activation = nn.ELU() # CHANGED: Added creating the ELU activation function
+        hidden_activation = nn.ELU() 
     elif hidden_activation_name == "Tanh":
         hidden_activation = nn.Tanh()
     else:
@@ -338,9 +339,9 @@ def create_model(trial):
     elif loss_name == "MAE":
         loss_fn = nn.L1Loss()
     elif loss_name == "Huber":
-        loss_fn = nn.SmoothL1Loss() # CHANGED: Added creating the Huber loss function
+        loss_fn = nn.SmoothL1Loss() 
     else:
-        # Added creating the log-cosh loss function
+        # Creating the log-cosh loss function
         def log_cosh_loss(y_pred, y_true):
             """Computes the log-cosh loss between the predicted and true values.
 
@@ -396,7 +397,7 @@ def create_model(trial):
 # 
 #  We first define a couple of functions used in the training and evaluation.
 
-# In[ ]:
+# In[7]:
 
 
 # Defining a function that computes loss and metrics for a given batch
@@ -456,7 +457,7 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[ ]:
+# In[8]:
 
 
 # Defining a function to train and evaluate a network
@@ -624,7 +625,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
 # ## The objective function and hyperparameter tuning
 
-# In[ ]:
+# In[9]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -661,10 +662,10 @@ def objective(trial):
     return test_metrics[-1]["l1_norm"]
 
 
-# In[ ]:
+# In[10]:
 
 
-# Creating a study object with Optuna with TPE sampler and median pruner # CHANGED: Changed Hyperband pruner to median pruner
+# Creating a study object with Optuna with TPE sampler and median pruner 
 study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.MedianPruner())
 
 # Running Optuna with 100 trials without sampler and pruner arguments
@@ -712,7 +713,7 @@ train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
 # In[ ]:
 
 
-# Plotting the losses and metrics for the best network # CHANGED: Added plotting L1 norm for both sets
+# Plotting the losses and metrics for the best network 
 plt.figure(figsize=(12, 8))
 plt.subplot(2, 2, 1)
 plt.plot(train_losses, label="Train Loss")
@@ -735,12 +736,12 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-# Added plotting MSE of training data and MSE of test data in one plot # CHANGED: Added plotting MSE of both sets and learning rate adaptions in one plot
+# Added plotting MSE of training data and MSE of test data in one plot 
 plt.figure(figsize=(8, 6))
 plt.plot(train_losses,label="MSE of training data")
 plt.plot(test_losses,label="MSE of test data")
 if scheduler is not None:
-    plt.plot([scheduler.get_last_lr()[0] for _ in range(n_epochs)], label="Learning rate") # CHANGED: Added plotting learning rate adaptions
+    plt.plot([scheduler.get_last_lr()[0] for _ in range(n_epochs)], label="Learning rate") 
 plt.xlabel("Epoch")
 plt.ylabel("MSE")
 plt.legend()
