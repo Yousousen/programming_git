@@ -168,7 +168,7 @@ class Net(nn.Module):
             self.layers.append(nn.Linear(n_units[i - 1], n_units[i]))
         self.layers.append(nn.Linear(n_units[-1], 1))
 
-        # Adding some assertions to check that the input arguments are valid # CHANGED: Added assertions and comments
+        # Adding some assertions to check that the input arguments are valid
         assert isinstance(n_layers, int) and n_layers > 0, "n_layers must be a positive integer"
         assert isinstance(n_units, list) and len(n_units) == n_layers, "n_units must be a list of length n_layers"
         assert all(isinstance(n, int) and n > 0 for n in n_units), "n_units must contain positive integers"
@@ -281,7 +281,7 @@ def create_model(trial):
     else:
         scheduler = None
 
-    # Returning all variables needed for saving and loading # CHANGED: Added a return statement to return all variables
+    # Returning all variables needed for saving and loading
     return net, loss_fn, optimizer, batch_size, n_epochs, scheduler, loss_name, optimizer_name, scheduler_name, n_units, n_layers, hidden_activation, output_activation
 
 
