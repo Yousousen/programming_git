@@ -10,3 +10,4 @@ torch
 optuna
 tensorboard
 tensorboardX
+torch-tb-profiler
