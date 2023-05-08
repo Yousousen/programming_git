@@ -21,21 +21,14 @@ import tensorboardX as tbx
 
 
 # ## Constants and flags to set
-<<<<<<< HEAD
-=======
 # Defining some constants and parameters for convenience.
->>>>>>> 0712b3e9a6145fc46dc4a4dc1cb5bdc792efd7ec
 
-# In[157]:
+# In[ ]:
 
 
-<<<<<<< HEAD
-# Defining some constants or parameters for convenience
-OPTIMIZE = False # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
-
-=======
 N_TRIALS = 100 # Number of trials for hyperparameter optimization
 OPTIMIZE = False # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
+TRAIN = False # Whether to train the model or to load a pretrained model.
 
 # Hyperparameters when no hyperparameter optimization is performed. 
 N_LAYERS_NO_OPT = 2
@@ -49,7 +42,6 @@ BATCH_SIZE_NO_OPT = 32
 N_EPOCHS_NO_OPT = 10
 SCHEDULER_NAME_NO_OPT = "ReduceLROnPlateau"
 
->>>>>>> 0712b3e9a6145fc46dc4a4dc1cb5bdc792efd7ec
 c = 1  # Speed of light (used in compute_conserved_variables and sample_primitive_variables functions)
 gamma = 5 / 3  # Adiabatic index (used in eos_analytic function)
 n_train_samples = 80000 # Number of training samples (used in generate_input_data and generate_labels functions)
@@ -63,11 +55,7 @@ np.random.seed(1) # Uncomment for pseudorandom data.
 
 # ## Generating the data
 
-<<<<<<< HEAD
-# In[145]:
-=======
 # In[ ]:
->>>>>>> 0712b3e9a6145fc46dc4a4dc1cb5bdc792efd7ec
 
 
 # Checking if GPU is available and setting the device accordingly
@@ -199,7 +187,7 @@ def generate_labels(n_samples):
     return p
 
 
-# In[146]:
+# In[ ]:
 
 
 # Generating the input and output data for train and test sets using the functions defined
@@ -231,13 +219,31 @@ print("Shape of y_test:", y_test.shape)
 
 # ## Defining the neural network
 
-# In[147]:
+# In[ ]:
 
 
 # Defining a class for the network
 class Net(nn.Module):
+    """A class for creating a network with a
+    variable number of hidden layers and units.
+
+    Attributes:
+        n_layers (int): The number of hidden layers in the network.
+        n_units (list): A list of integers representing the number of units in each hidden layer.
+        hidden_activation (torch.nn.Module): The activation function for the hidden layers.
+        output_activation (torch.nn.Module): The activation function for the output layer.
+        layers (torch.nn.ModuleList): A list of linear layers in the network.
+    """
 
     def __init__(self, n_layers, n_units, hidden_activation, output_activation):
+        """Initializes the network with the given hyperparameters.
+
+        Args:
+            n_layers (int): The number of hidden layers in the network.
+            n_units (list): A list of integers representing the number of units in each hidden layer.
+            hidden_activation (torch.nn.Module): The activation function for the hidden layers.
+            output_activation (torch.nn.Module): The activation function for the output layer.
+        """
         super().__init__()
         self.n_layers = n_layers
         self.n_units = n_units
@@ -250,11 +256,7 @@ class Net(nn.Module):
             self.layers.append(nn.Linear(n_units[i - 1], n_units[i]))
         self.layers.append(nn.Linear(n_units[-1], 1))
 
-<<<<<<< HEAD
-        # Adding some assertions to check that the input arguments are valid.
-=======
         # Adding some assertions to check that the input arguments are valid
->>>>>>> 0712b3e9a6145fc46dc4a4dc1cb5bdc792efd7ec
         assert isinstance(n_layers, int) and n_layers > 0, "n_layers must be a positive integer"
         assert isinstance(n_units, list) and len(n_units) == n_layers, "n_units must be a list of length n_layers"
         assert all(isinstance(n, int) and n > 0 for n in n_units), "n_units must contain positive integers"
@@ -262,6 +264,14 @@ class Net(nn.Module):
         assert isinstance(output_activation, nn.Module), "output_activation must be a torch.nn.Module"
 
     def forward(self, x):
+        """Performs a forward pass on the input tensor.
+
+        Args:
+            x (torch.Tensor): The input tensor of shape (batch_size, 3).
+
+        Returns:
+            torch.Tensor: The output tensor of shape (batch_size, 1).
+        """
         # Looping over the hidden layers and applying the linear transformation and the activation function
         for layer in self.layers[:-1]:
             x = self.hidden_activation(layer(x))
@@ -274,7 +284,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[148]:
+# In[ ]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -420,7 +430,7 @@ def create_model(trial, optimize):
 # 
 #  We first define a couple of functions used in the training and evaluation.
 
-# In[149]:
+# In[ ]:
 
 
 # Defining a function that computes loss and metrics for a given batch
@@ -480,7 +490,7 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[150]:
+# In[ ]:
 
 
 # Defining a function to train and evaluate a network
@@ -648,7 +658,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
 # ## The objective function and hyperparameter tuning
 
-# In[151]:
+# In[ ]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -686,7 +696,7 @@ def objective(trial):
     return test_metrics[-1]["l1_norm"]
 
 
-# In[152]:
+# In[ ]:
 
 
 if OPTIMIZE:
@@ -705,9 +715,9 @@ if OPTIMIZE:
         print(f"    {key}: {value}")
 
 
-# ## Training with the best hyperparameters
+# ## Training the model
 
-# In[153]:
+# In[ ]:
 
 
 # Creating the best network and optimizer using the best hyperparameters
@@ -763,7 +773,7 @@ print("output_activation:", output_activation)
 # In[ ]:
 
 
-# Training and evaluating the best network using the train_and_eval function
+# Training and evaluating the network using the train_and_eval function
 train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
     net, loss_fn, optimizer, batch_size, n_epochs, scheduler
 )
@@ -771,7 +781,7 @@ train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
 
 # ## Visualizing the results
 
-# In[154]:
+# In[ ]:
 
 
 # Plotting the losses and metrics for the best network 
@@ -811,7 +821,7 @@ plt.show()
 
 # ## Saving
 
-# In[155]:
+# In[ ]:
 
 
 import json
@@ -861,10 +871,11 @@ train_df.to_csv("train_output.csv", index=False)
 
 # ## Loading
 
-# In[156]:
+# In[ ]:
 
 
 # load the dictionary from the .json file
+
 with open("var_dict.json", "r") as f:
   var_dict_loaded = json.load(f)
 
@@ -912,6 +923,7 @@ else:
   # create the log-cosh loss function
   def log_cosh_loss_loaded(y_pred, y_true):
     return torch.mean(torch.log(torch.cosh(y_pred - y_true)))
+  loss_fn_loaded = log_cosh_loss_loaded
 
 # load the optimizer from the .pth file
 if optimizer_name_loaded == "SGD":
@@ -941,41 +953,6 @@ else:
 if scheduler_loaded is not None:
   scheduler_loaded.load_state_dict(torch.load("scheduler.pth"))
             
-  loss_fn_loaded = log_cosh_loss_loaded
-
-# load the network from the .pth file
-net = Net(n_layers_loaded, n_units_loaded, hidden_activation_loaded, output_activation_loaded).to(device)
-net.load_state_dict(torch.load("net.pth"))
-
-# load the optimizer from the .pth file
-if optimizer_name_loaded == "SGD":
-  optimizer_loaded = optim.SGD(net.parameters(), lr=lr_loaded)
-elif optimizer_name_loaded == "Adam":
-  optimizer_loaded = optim.Adam(net.parameters(), lr=lr_loaded)
-elif optimizer_name_loaded == "RMSprop":
-  optimizer_loaded = optim.RMSprop(net.parameters(), lr=lr_loaded)
-else:
-  # Added loading the Adagrad optimizer
-  optimizer_loaded = optim.Adagrad(net.parameters(), lr=lr_loaded)
-optimizer_loaded.load_state_dict(torch.load("optimizer.pth"))
-
-# load the scheduler from the .pth file if it is not None
-if scheduler_name_loaded == "StepLR":
-  scheduler_loaded = optim.lr_scheduler.StepLR(optimizer_loaded, step_size=10, gamma=0.1)
-elif scheduler_name_loaded == "ExponentialLR":
-  scheduler_loaded = optim.lr_scheduler.ExponentialLR(optimizer_loaded, gamma=0.9)
-elif scheduler_name_loaded == "CosineAnnealingLR":
-  scheduler_loaded = optim.lr_scheduler.CosineAnnealingLR(optimizer_loaded, T_max=10)
-elif scheduler_name_loaded == "ReduceLROnPlateau":
-  scheduler_loaded = optim.lr_scheduler.ReduceLROnPlateau(
-                    optimizer_loaded, mode="min", factor=0.5, patience=5, threshold=0.0005, min_lr=1e-6
-                )
-else:
-  scheduler_loaded = None
-
-if scheduler_loaded is not None:
-  scheduler_loaded.load_state_dict(torch.load("scheduler.pth"))
-
 # Saving the output of the training using pandas
 train_df_loaded = pd.DataFrame(
     {
@@ -1012,7 +989,26 @@ test_metrics_loaded = [
 # In[ ]:
 
 
-get_ipython().run_cell_magic('script', 'echo printing all the loaded variables', '\nnet\noptimizer\nscheduler\nvar_dict\nbatch_size\nn_epochs\nloss_name\noptimizer_name\nscheduler_name\nn_units\nn_layers\nhidden_activation_name\noutput_activation_name\nlr\nhidden_activation\noutput_activation\ntrain_df\ntrain_losses\ntest_losses\ntrain_metrics\ntest_metrics\n')
+batch_size_loaded
+n_epochs_loaded
+loss_name_loaded
+optimizer_name_loaded
+scheduler_name_loaded
+n_units_loaded
+n_layers_loaded
+hidden_activation_name_loaded
+output_activation_name_loaded
+lr_loaded
+hidden_activation_loaded
+output_activation_loaded
+net_loaded
+loss_fn_loaded
+optimizer_loaded
+scheduler_loaded
+#train_losses_loaded
+#test_losses_loaded
+#train_metrics_loaded
+#test_metrics_loaded
 
 
 # ## Porting the model to C++
@@ -1032,18 +1028,8 @@ get_ipython().run_cell_magic('', 'script echo skipping', 'n_layers\nhidden_activ
 # In[ ]:
 
 
-get_ipython().run_cell_magic('script', 'echo skipping', '\n# Loading the state dictionary into the network instance using net.load_state_dict\nnet.load_state_dict(torch.load("net.pth"))\n\n# Scripting the network using torch.jit.script\nnet_scripted = torch.jit.script(net)\n\n# Saving the scripted module to a file using the save method\nnet_scripted.save(\'net_scripted.pt\')\n')
-
-
-# ## Porting the model to C++
-# 
-# We use TorchScript.
-
-# In[2]:
-
-
 # Scripting the network using torch.jit.script
-net_scripted = torch.jit.script(net)
+net_scripted = torch.jit.script(net_loaded)
 
 # Saving the scripted module to a file using the save method
 net_scripted.save('net_scripted.pt')
