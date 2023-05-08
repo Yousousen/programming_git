@@ -26,9 +26,8 @@ import tensorboardX as tbx
 # In[ ]:
 
 
-# Number of trials for hyperparameter optimization
-N_TRIALS = 1
-OPTIMIZE = True # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
+N_TRIALS = 100 # Number of trials for hyperparameter optimization
+OPTIMIZE = False # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
 
 # Hyperparameters when no hyperparameter optimization is performed. 
 N_LAYERS_NO_OPT = 2
@@ -855,84 +854,6 @@ var_dict = {
 with open("var_dict.json", "w") as f:
   json.dump(var_dict, f)
 
-
-# ## Loading
-
-# In[ ]:
-
-
-# Load the network from the .pth file
-net = Net(n_layers, n_units, hidden_activation, output_activation).to(device)
-net.load_state_dict(torch.load("net.pth"))
-
-# load the optimizer from the .pth file
-if optimizer_name == "SGD":
-  optimizer = optim.SGD(net.parameters(), lr=lr)
-elif optimizer_name == "Adam":
-  optimizer = optim.Adam(net.parameters(), lr=lr)
-elif optimizer_name == "RMSprop":
-  optimizer = optim.RMSprop(net.parameters(), lr=lr)
-else:
-  # Added loading the Adagrad optimizer
-  optimizer = optim.Adagrad(net.parameters(), lr=lr)
-optimizer.load_state_dict(torch.load("optimizer.pth"))
-
-# load the scheduler from the .pth file if it is not None
-if scheduler_name == "StepLR":
-  scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
-elif scheduler_name == "ExponentialLR":
-  scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
-elif scheduler_name == "CosineAnnealingLR":
-  # Added loading the CosineAnnealingLR scheduler
-  scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
-elif scheduler_name == "ReduceLROnPlateau":
-  # Added loading the ReduceLROnPlateau scheduler with a threshold value of 0.01
-  #scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-  #    optimizer, mode="min", factor=0.1, patience=10, threshold=0.01
-  #)
-  # Use Dieseldorst et al. settings and add to that a minimum lr.
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-                    optimizer, mode="min", factor=0.5, patience=5, threshold=0.0005, min_lr=1e-6
-                )
-else:
-  scheduler = None
-
-if scheduler is not None:
-  scheduler.load_state_dict(torch.load("scheduler.pth"))
-
-
-# load the dictionary from the .json file
-with open("var_dict.json", "r") as f:
-  var_dict = json.load(f)
-
-# extract the variables from the dictionary
-batch_size = var_dict["batch_size"]
-n_epochs = var_dict["n_epochs"]
-loss_name = var_dict["loss_name"]
-optimizer_name = var_dict["optimizer_name"]
-scheduler_name = var_dict["scheduler_name"]
-n_units = var_dict["n_units"]
-n_layers = var_dict["n_layers"]
-hidden_activation_name = var_dict["hidden_activation_name"]
-output_activation_name = var_dict["output_activation_name"]
-lr = var_dict["lr"]
-
-# create the activation functions from their names
-if hidden_activation_name == "ReLU":
-  hidden_activation = nn.ReLU()
-elif hidden_activation_name == "LeakyReLU":
-  hidden_activation = nn.LeakyReLU() 
-elif hidden_activation_name == "ELU":
-  hidden_activation = nn.ELU() 
-elif hidden_activation_name == "Tanh":
-  hidden_activation = nn.Tanh()
-else:
-  hidden_activation = nn.Sigmoid()
-
-if output_activation_name == "ReLU":
-  output_activation = nn
-
-
 # Saving the output of the training using pandas
 train_df = pd.DataFrame(
     {
@@ -946,24 +867,179 @@ train_df = pd.DataFrame(
 )
 train_df.to_csv("train_output.csv", index=False)
 
+
+# ## Loading
+
+# In[ ]:
+
+
+# load the dictionary from the .json file
+with open("var_dict.json", "r") as f:
+  var_dict_loaded = json.load(f)
+
+# extract the variables from the dictionary
+batch_size_loaded = var_dict_loaded["batch_size"]
+n_epochs_loaded = var_dict_loaded["n_epochs"]
+loss_name_loaded = var_dict_loaded["loss_name"]
+optimizer_name_loaded = var_dict_loaded["optimizer_name"]
+scheduler_name_loaded = var_dict_loaded["scheduler_name"]
+n_units_loaded = var_dict_loaded["n_units"]
+n_layers_loaded = var_dict_loaded["n_layers"]
+hidden_activation_name_loaded = var_dict_loaded["hidden_activation_name"]
+output_activation_name_loaded = var_dict_loaded["output_activation_name"]
+lr_loaded = var_dict_loaded["lr"]
+
+# create the activation functions from their names
+if hidden_activation_name_loaded == "ReLU":
+  hidden_activation_loaded = nn.ReLU()
+elif hidden_activation_name_loaded == "LeakyReLU":
+  hidden_activation_loaded = nn.LeakyReLU() 
+elif hidden_activation_name_loaded == "ELU":
+  hidden_activation_loaded = nn.ELU() 
+elif hidden_activation_name_loaded == "Tanh":
+  hidden_activation_loaded = nn.Tanh()
+else:
+  hidden_activation_loaded = nn.Sigmoid()
+
+if output_activation_name_loaded == "ReLU":
+  output_activation_loaded = nn.ReLU()
+else:
+  output_activation_loaded = nn.Identity()
+
+# load the network from the .pth file
+net_loaded = Net(n_layers_loaded, n_units_loaded, hidden_activation_loaded, output_activation_loaded).to(device)
+net_loaded.load_state_dict(torch.load("net.pth"))
+
+# create the loss function from its name
+if loss_name_loaded == "MSE":
+  loss_fn_loaded = nn.MSELoss()
+elif loss_name_loaded == "MAE":
+  loss_fn_loaded = nn.L1Loss()
+elif loss_name_loaded == "Huber":
+  loss_fn_loaded = nn.SmoothL1Loss() 
+else:
+  # create the log-cosh loss function
+  def log_cosh_loss_loaded(y_pred, y_true):
+    return torch.mean(torch.log(torch.cosh(y_pred - y_true)))
+
+# load the optimizer from the .pth file
+if optimizer_name_loaded == "SGD":
+  optimizer_loaded = optim.SGD(net_loaded.parameters(), lr=lr_loaded)
+elif optimizer_name_loaded == "Adam":
+  optimizer_loaded = optim.Adam(net_loaded.parameters(), lr=lr_loaded)
+elif optimizer_name_loaded == "RMSprop":
+  optimizer_loaded = optim.RMSprop(net_loaded.parameters(), lr=lr_loaded)
+else:
+  # Added loading the Adagrad optimizer
+  optimizer_loaded = optim.Adagrad(net_loaded.parameters(), lr=lr_loaded)
+optimizer_loaded.load_state_dict(torch.load("optimizer.pth"))
+
+if scheduler_name_loaded == "StepLR":
+  scheduler_loaded = optim.lr_scheduler.StepLR(optimizer_loaded, step_size=10, gamma=0.1)
+elif scheduler_name_loaded == "ExponentialLR":
+  scheduler_loaded = optim.lr_scheduler.ExponentialLR(optimizer_loaded, gamma=0.9)
+elif scheduler_name_loaded == "CosineAnnealingLR":
+  scheduler_loaded = optim.lr_scheduler.CosineAnnealingLR(optimizer_loaded, T_max=10)
+elif scheduler_name_loaded == "ReduceLROnPlateau":
+  scheduler_loaded = optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer_loaded, mode="min", factor=0.5, patience=5, threshold=0.0005, min_lr=1e-6
+                )
+else:
+  scheduler_loaded = None
+
+if scheduler_loaded is not None:
+  scheduler_loaded.load_state_dict(torch.load("scheduler.pth"))
+            
+  loss_fn_loaded = log_cosh_loss_loaded
+
+# load the network from the .pth file
+net = Net(n_layers_loaded, n_units_loaded, hidden_activation_loaded, output_activation_loaded).to(device)
+net.load_state_dict(torch.load("net.pth"))
+
+# load the optimizer from the .pth file
+if optimizer_name_loaded == "SGD":
+  optimizer_loaded = optim.SGD(net.parameters(), lr=lr_loaded)
+elif optimizer_name_loaded == "Adam":
+  optimizer_loaded = optim.Adam(net.parameters(), lr=lr_loaded)
+elif optimizer_name_loaded == "RMSprop":
+  optimizer_loaded = optim.RMSprop(net.parameters(), lr=lr_loaded)
+else:
+  # Added loading the Adagrad optimizer
+  optimizer_loaded = optim.Adagrad(net.parameters(), lr=lr_loaded)
+optimizer_loaded.load_state_dict(torch.load("optimizer.pth"))
+
+# load the scheduler from the .pth file if it is not None
+if scheduler_name_loaded == "StepLR":
+  scheduler_loaded = optim.lr_scheduler.StepLR(optimizer_loaded, step_size=10, gamma=0.1)
+elif scheduler_name_loaded == "ExponentialLR":
+  scheduler_loaded = optim.lr_scheduler.ExponentialLR(optimizer_loaded, gamma=0.9)
+elif scheduler_name_loaded == "CosineAnnealingLR":
+  scheduler_loaded = optim.lr_scheduler.CosineAnnealingLR(optimizer_loaded, T_max=10)
+elif scheduler_name_loaded == "ReduceLROnPlateau":
+  scheduler_loaded = optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer_loaded, mode="min", factor=0.5, patience=5, threshold=0.0005, min_lr=1e-6
+                )
+else:
+  scheduler_loaded = None
+
+if scheduler_loaded is not None:
+  scheduler_loaded.load_state_dict(torch.load("scheduler.pth"))
+
+# Saving the output of the training using pandas
+train_df_loaded = pd.DataFrame(
+    {
+        "train_loss": train_losses,
+        "test_loss": test_losses,
+        "train_l1_norm": [m["l1_norm"] for m in train_metrics],
+        "test_l1_norm": [m["l1_norm"] for m in test_metrics],
+        "train_linf_norm": [m["linf_norm"] for m in train_metrics],
+        "test_linf_norm": [m["linf_norm"] for m in test_metrics],
+    }
+)
+train_df_loaded.to_csv("train_output.csv", index=False)
+
 # Loading the output of the training using pandas
-train_df = pd.read_csv("train_output.csv")
-train_losses = train_df["train_loss"].tolist()
-test_losses = train_df["test_loss"].tolist()
-train_metrics = [
+train_df_loaded = pd.read_csv("train_output.csv")
+train_losses_loaded = train_df_loaded["train_loss"].tolist()
+test_losses_loaded = train_df_loaded["test_loss"].tolist()
+train_metrics_loaded = [
     {
-        "l1_norm": train_df["train_l1_norm"][i],
-        "linf_norm": train_df["train_linf_norm"][i],
+        "l1_norm": train_df_loaded["train_l1_norm"][i],
+        "linf_norm": train_df_loaded["train_linf_norm"][i],
     }
-    for i in range(len(train_df))
+    for i in range(len(train_df_loaded))
 ]
-test_metrics = [
+test_metrics_loaded = [
     {
-        "l1_norm": train_df["test_l1_norm"][i],
-        "linf_norm": train_df["test_linf_norm"][i],
+        "l1_norm": train_df_loaded["test_l1_norm"][i],
+        "linf_norm": train_df_loaded["test_linf_norm"][i],
     }
-    for i in range(len(train_df))
+    for i in range(len(train_df_loaded))
 ]
+
+
+# In[ ]:
+
+
+get_ipython().run_cell_magic('script', 'echo printing all the loaded variables', '\nnet\noptimizer\nscheduler\nvar_dict\nbatch_size\nn_epochs\nloss_name\noptimizer_name\nscheduler_name\nn_units\nn_layers\nhidden_activation_name\noutput_activation_name\nlr\nhidden_activation\noutput_activation\ntrain_df\ntrain_losses\ntest_losses\ntrain_metrics\ntest_metrics\n')
 
 
 # ## Porting the model to C++
+
+# In[ ]:
+
+
+get_ipython().run_cell_magic('', 'script echo skipping', '# Creating an instance of the network class with the same parameters as before\nn_layers = len(n_units)\nhidden_activation = getattr(torch.nn, hidden_activation_name)()\noutput_activation = getattr(torch.nn, output_activation_name)()\nnet = Net(n_layers, n_units, hidden_activation, output_activation)\n')
+
+
+# In[ ]:
+
+
+get_ipython().run_cell_magic('', 'script echo skipping', 'n_layers\nhidden_activation\noutput_activation\n')
+
+
+# In[ ]:
+
+
+get_ipython().run_cell_magic('script', 'echo skipping', '\n# Loading the state dictionary into the network instance using net.load_state_dict\nnet.load_state_dict(torch.load("net.pth"))\n\n# Scripting the network using torch.jit.script\nnet_scripted = torch.jit.script(net)\n\n# Saving the scripted module to a file using the save method\nnet_scripted.save(\'net_scripted.pt\')\n')
+
