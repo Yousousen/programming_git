@@ -31,7 +31,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 N_TRIALS = 100 # Number of trials for hyperparameter optimization
 OPTIMIZE = False # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
-TRAIN = False # Whether to train the model or to load a pretrained model.
 
 # Hyperparameters when no hyperparameter optimization is performed. 
 N_LAYERS_NO_OPT = 2
@@ -42,7 +41,7 @@ LOSS_NAME_NO_OPT = "MSE"
 OPTIMIZER_NAME_NO_OPT = "Adam"
 LR_NO_OPT = 6e-4
 BATCH_SIZE_NO_OPT = 32
-N_EPOCHS_NO_OPT = 10
+N_EPOCHS_NO_OPT = 30
 SCHEDULER_NAME_NO_OPT = "ReduceLROnPlateau"
 
 c = 1  # Speed of light (used in compute_conserved_variables and sample_primitive_variables functions)
@@ -1002,19 +1001,56 @@ scheduler_loaded
 #test_metrics_loaded
 
 
+# ## Evaluate a loaded network on arbirary input
+
+# In[ ]:
+
+
+net_loaded(torch.tensor([1.0, 10.0, 1.0]).to(device))
+
+
+# In[ ]:
+
+
+print(list(net.parameters()))
+
+
+# In[ ]:
+
+
+print(list(net_loaded.parameters()))
+
+
+# In[ ]:
+
+
+# Set the network to evaluation mode
+net.eval()
+# Create arbitrary input
+inputs =  generate_input_data(20)
+
+
+# In[ ]:
+
+
+# Pass the inputs to the network and get the outputs
+outputs = [net(input) for input in inputs]
+# Print the outputs
+outputs
+
+
+# In[ ]:
+
+
+# Set the network to evaluation mode
+net_loaded.eval()
+# Pass the inputs to the network and get the outputs
+outputs = [net_loaded(input) for input in inputs]
+# Print the outputs
+outputs
+
+
 # ## Porting the model to C++
-
-# In[ ]:
-
-
-get_ipython().run_cell_magic('', 'script echo skipping', '# Creating an instance of the network class with the same parameters as before\nn_layers = len(n_units)\nhidden_activation = getattr(torch.nn, hidden_activation_name)()\noutput_activation = getattr(torch.nn, output_activation_name)()\nnet = Net(n_layers, n_units, hidden_activation, output_activation)\n')
-
-
-# In[ ]:
-
-
-get_ipython().run_cell_magic('', 'script echo skipping', 'n_layers\nhidden_activation\noutput_activation\n')
-
 
 # In[ ]:
 
