@@ -27,7 +27,7 @@ int main() {
 
 
   // Converting the input data from python to C++ using torch::from_blob function
-  float input_data[] = {12.0043, 32.6378, 31.5031};
+  float input_data[] = {3.0708, 0.4283, 0.5976};
   auto input_tensor = torch::from_blob(input_data, {1, 3});
 
   // Moving the input tensor to the same device as the model
