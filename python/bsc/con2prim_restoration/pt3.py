@@ -20,16 +20,14 @@ import optuna
 import tensorboardX as tbx
 
 
-# ## Generating the data
+# ## Constants and flags to set
 
-# In[ ]:
+# In[157]:
 
-
-# Checking if GPU is available and setting the device accordingly
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Defining some constants or parameters for convenience
 OPTIMIZE = False # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
+
 c = 1  # Speed of light (used in compute_conserved_variables and sample_primitive_variables functions)
 gamma = 5 / 3  # Adiabatic index (used in eos_analytic function)
 n_train_samples = 80000 # Number of training samples (used in generate_input_data and generate_labels functions)
@@ -38,8 +36,16 @@ rho_interval = (0, 10.1) # Sampling interval for rest-mass density (used in samp
 vx_interval = (0, 0.721 * c) # Sampling interval for velocity in x-direction (used in sample_primitive_variables function)
 epsilon_interval = (0, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
 
-# Uncomment for pseudorandom data.
-np.random.seed(1)
+np.random.seed(1) # Uncomment for pseudorandom data.
+
+
+# ## Generating the data
+
+# In[145]:
+
+
+# Checking if GPU is available and setting the device accordingly
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Defining an analytic equation of state (EOS) for an ideal gas
 def eos_analytic(rho, epsilon):
@@ -167,7 +173,7 @@ def generate_labels(n_samples):
     return p
 
 
-# In[ ]:
+# In[146]:
 
 
 # Generating the input and output data for train and test sets using the functions defined
@@ -199,31 +205,13 @@ print("Shape of y_test:", y_test.shape)
 
 # ## Defining the neural network
 
-# In[ ]:
+# In[147]:
 
 
 # Defining a class for the network
 class Net(nn.Module):
-    """A class for creating a network with a
-    variable number of hidden layers and units.
-
-    Attributes:
-        n_layers (int): The number of hidden layers in the network.
-        n_units (list): A list of integers representing the number of units in each hidden layer.
-        hidden_activation (torch.nn.Module): The activation function for the hidden layers.
-        output_activation (torch.nn.Module): The activation function for the output layer.
-        layers (torch.nn.ModuleList): A list of linear layers in the network.
-    """
 
     def __init__(self, n_layers, n_units, hidden_activation, output_activation):
-        """Initializes the network with the given hyperparameters.
-
-        Args:
-            n_layers (int): The number of hidden layers in the network.
-            n_units (list): A list of integers representing the number of units in each hidden layer.
-            hidden_activation (torch.nn.Module): The activation function for the hidden layers.
-            output_activation (torch.nn.Module): The activation function for the output layer.
-        """
         super().__init__()
         self.n_layers = n_layers
         self.n_units = n_units
@@ -236,7 +224,7 @@ class Net(nn.Module):
             self.layers.append(nn.Linear(n_units[i - 1], n_units[i]))
         self.layers.append(nn.Linear(n_units[-1], 1))
 
-        # Adding some assertions to check that the input arguments are valid # CHANGED: Added assertions and comments
+        # Adding some assertions to check that the input arguments are valid.
         assert isinstance(n_layers, int) and n_layers > 0, "n_layers must be a positive integer"
         assert isinstance(n_units, list) and len(n_units) == n_layers, "n_units must be a list of length n_layers"
         assert all(isinstance(n, int) and n > 0 for n in n_units), "n_units must contain positive integers"
@@ -244,14 +232,6 @@ class Net(nn.Module):
         assert isinstance(output_activation, nn.Module), "output_activation must be a torch.nn.Module"
 
     def forward(self, x):
-        """Performs a forward pass on the input tensor.
-
-        Args:
-            x (torch.Tensor): The input tensor of shape (batch_size, 3).
-
-        Returns:
-            torch.Tensor: The output tensor of shape (batch_size, 1).
-        """
         # Looping over the hidden layers and applying the linear transformation and the activation function
         for layer in self.layers[:-1]:
             x = self.hidden_activation(layer(x))
@@ -264,7 +244,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[ ]:
+# In[148]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -408,7 +388,7 @@ def create_model(trial, optimize):
 # 
 #  We first define a couple of functions used in the training and evaluation.
 
-# In[ ]:
+# In[149]:
 
 
 # Defining a function that computes loss and metrics for a given batch
@@ -468,7 +448,7 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[ ]:
+# In[150]:
 
 
 # Defining a function to train and evaluate a network
@@ -636,7 +616,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
 # ## The objective function and hyperparameter tuning
 
-# In[ ]:
+# In[151]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -673,7 +653,7 @@ def objective(trial):
     return test_metrics[-1]["l1_norm"]
 
 
-# In[ ]:
+# In[152]:
 
 
 if OPTIMIZE:
@@ -694,7 +674,7 @@ if OPTIMIZE:
 
 # ## Training with the best hyperparameters
 
-# In[ ]:
+# In[153]:
 
 
 # Creating the best network and optimizer using the best hyperparameters
@@ -737,7 +717,7 @@ train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
 
 # ## Visualizing the results
 
-# In[ ]:
+# In[154]:
 
 
 # Plotting the losses and metrics for the best network 
@@ -777,7 +757,7 @@ plt.show()
 
 # ## Saving
 
-# In[ ]:
+# In[155]:
 
 
 import pickle
@@ -826,8 +806,22 @@ train_df.to_csv("train_output.csv", index=False)
 
 # ## Loading
 
-# In[ ]:
+# In[156]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n## Loading the best network state dictionary using torch.load\nstate_dict = torch.load("best_net.pth")\n\n# Loading the state dictionary into a new network instance using net.load_state_dict\nnew_net = Net(n_layers, n_units, hidden_activation, output_activation).to(device)\nnew_net.load_state_dict(state_dict)\n\n\n# In[ ]:\n\n\n# Loading the loss function name using pickle\nwith open("loss_fn.pkl", "rb") as f:\n    loss_name = pickle.load(f)\n\n# Loading the optimizer name and parameters using pickle\nwith open("optimizer.pkl", "rb") as f:\n    optimizer_name, optimizer_state_dict = pickle.load(f)\n\n# Loading the best number of epochs using pickle\nwith open("n_epochs.pkl", "rb") as f:\n    n_epochs = pickle.load(f)\n\n# Loading the scheduler name and parameters using pickle\nwith open("scheduler.pkl", "rb") as f:\n    scheduler_name, scheduler_state_dict = pickle.load(f)\n\n# Loading the number of units for each hidden layer using pickle\nwith open("n_units.pkl", "rb") as f:\n    n_units = pickle.load(f)\n\n# Loading the output of create_model using pickle\nwith open("create_model.pkl", "rb") as f:\n    net, loss_fn, optimizer, batch_size, n_epochs, scheduler = pickle.load(f)\n\n# Loading the output of the training using pandas\ntrain_df = pd.read_csv("train_output.csv")\ntrain_losses = train_df["train_loss"].tolist()\ntest_losses = train_df["test_loss"].tolist()\ntrain_metrics = [\n    {\n        "l1_norm": train_df["train_l1_norm"][i],\n        "linf_norm": train_df["train_linf_norm"][i],\n    }\n    for i in range(len(train_df))\n]\ntest_metrics = [\n    {\n        "l1_norm": train_df["test_l1_norm"][i],\n        "linf_norm": train_df["test_linf_norm"][i],\n    }\n    for i in range(len(train_df))\n]\n')
+
+
+# ## Porting the model to C++
+# 
+# We use TorchScript.
+
+# In[2]:
+
+
+# Scripting the network using torch.jit.script
+net_scripted = torch.jit.script(net)
+
+# Saving the scripted module to a file using the save method
+net_scripted.save('net_scripted.pt')
 
