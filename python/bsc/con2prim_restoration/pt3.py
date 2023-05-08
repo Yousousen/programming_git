@@ -19,6 +19,9 @@ import torch.nn.functional as F
 import optuna
 import tensorboardX as tbx
 
+# Checking if GPU is available and setting the device accordingly
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # ## Constants and flags to set
 # Defining some constants and parameters for convenience.
@@ -57,9 +60,6 @@ np.random.seed(1) # Uncomment for pseudorandom data.
 
 # In[ ]:
 
-
-# Checking if GPU is available and setting the device accordingly
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Defining an analytic equation of state (EOS) for an ideal gas
 def eos_analytic(rho, epsilon):
@@ -263,6 +263,7 @@ class Net(nn.Module):
         assert isinstance(hidden_activation, nn.Module), "hidden_activation must be a torch.nn.Module"
         assert isinstance(output_activation, nn.Module), "output_activation must be a torch.nn.Module"
 
+    #@torch.jit.script_method
     def forward(self, x):
         """Performs a forward pass on the input tensor.
 
@@ -874,8 +875,10 @@ train_df.to_csv("train_output.csv", index=False)
 # In[ ]:
 
 
-# load the dictionary from the .json file
+import json
+import pandas as pd
 
+# load the dictionary from the .json file
 with open("var_dict.json", "r") as f:
   var_dict_loaded = json.load(f)
 
@@ -953,18 +956,6 @@ else:
 if scheduler_loaded is not None:
   scheduler_loaded.load_state_dict(torch.load("scheduler.pth"))
             
-# Saving the output of the training using pandas
-train_df_loaded = pd.DataFrame(
-    {
-        "train_loss": train_losses,
-        "test_loss": test_losses,
-        "train_l1_norm": [m["l1_norm"] for m in train_metrics],
-        "test_l1_norm": [m["l1_norm"] for m in test_metrics],
-        "train_linf_norm": [m["linf_norm"] for m in train_metrics],
-        "test_linf_norm": [m["linf_norm"] for m in test_metrics],
-    }
-)
-train_df_loaded.to_csv("train_output.csv", index=False)
 
 # Loading the output of the training using pandas
 train_df_loaded = pd.read_csv("train_output.csv")
