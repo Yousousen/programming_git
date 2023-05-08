@@ -20,16 +20,28 @@ import optuna
 import tensorboardX as tbx
 
 
-# ## Generating the data
+# ## Constants and flags to set
+# Defining some constants and parameters for convenience.
 
 # In[ ]:
 
 
-# Checking if GPU is available and setting the device accordingly
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Number of trials for hyperparameter optimization
+N_TRIALS = 1
+OPTIMIZE = True # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
 
-# Defining some constants or parameters for convenience
-OPTIMIZE = False # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
+# Hyperparameters when no hyperparameter optimization is performed. 
+N_LAYERS_NO_OPT = 2
+N_UNITS_NO_OPT = [600, 200]
+HIDDEN_ACTIVATION_NAME_NO_OPT = "Sigmoid"
+OUTPUT_ACTIVATION_NAME_NO_OPT = "ReLU"
+LOSS_NAME_NO_OPT = "MSE"
+OPTIMIZER_NAME_NO_OPT = "Adam"
+LR_NO_OPT = 6e-4
+BATCH_SIZE_NO_OPT = 32
+N_EPOCHS_NO_OPT = 10
+SCHEDULER_NAME_NO_OPT = "ReduceLROnPlateau"
+
 c = 1  # Speed of light (used in compute_conserved_variables and sample_primitive_variables functions)
 gamma = 5 / 3  # Adiabatic index (used in eos_analytic function)
 n_train_samples = 80000 # Number of training samples (used in generate_input_data and generate_labels functions)
@@ -38,8 +50,16 @@ rho_interval = (0, 10.1) # Sampling interval for rest-mass density (used in samp
 vx_interval = (0, 0.721 * c) # Sampling interval for velocity in x-direction (used in sample_primitive_variables function)
 epsilon_interval = (0, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
 
-# Uncomment for pseudorandom data.
-np.random.seed(1)
+np.random.seed(1) # Uncomment for pseudorandom data.
+
+
+# ## Generating the data
+
+# In[ ]:
+
+
+# Checking if GPU is available and setting the device accordingly
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Defining an analytic equation of state (EOS) for an ideal gas
 def eos_analytic(rho, epsilon):
@@ -236,7 +256,7 @@ class Net(nn.Module):
             self.layers.append(nn.Linear(n_units[i - 1], n_units[i]))
         self.layers.append(nn.Linear(n_units[-1], 1))
 
-        # Adding some assertions to check that the input arguments are valid # CHANGED: Added assertions and comments
+        # Adding some assertions to check that the input arguments are valid
         assert isinstance(n_layers, int) and n_layers > 0, "n_layers must be a positive integer"
         assert isinstance(n_units, list) and len(n_units) == n_layers, "n_units must be a list of length n_layers"
         assert all(isinstance(n, int) and n > 0 for n in n_units), "n_units must contain positive integers"
@@ -292,7 +312,8 @@ def create_model(trial, optimize):
             the number of units in each hidden layer,
             n_layers is an integer representing the number of hidden layers in the network,
             hidden_activation is a torch.nn.Module representing the activation function for the hidden layers,
-            output_activation is a torch.nn.Module representing the activation function for the output layer.
+            output_activation is a torch.nn.Module representing the activation function for the output layer,
+            lr is the (initial) learning rate.
     """
     # If optimize is True, sample the hyperparameters from the search space
     if optimize:
@@ -321,16 +342,17 @@ def create_model(trial, optimize):
     # If optimize is False, use the predefined values
     else:
         # Setting the hyperparameters to the predefined values
-        n_layers = 2
-        n_units = [600, 200]
-        hidden_activation_name = "Sigmoid"
-        output_activation_name = "ReLU"
-        loss_name = "MSE"
-        optimizer_name = "Adam"
-        lr = 6e-4
-        batch_size = 32
-        n_epochs = 400
-        scheduler_name = "ReduceLROnPlateau"
+        n_layers = N_LAYERS_NO_OPT
+        n_units = N_UNITS_NO_OPT
+        hidden_activation_name = HIDDEN_ACTIVATION_NAME_NO_OPT
+        output_activation_name = OUTPUT_ACTIVATION_NAME_NO_OPT
+        loss_name = LOSS_NAME_NO_OPT
+        optimizer_name = OPTIMIZER_NAME_NO_OPT
+        lr = LR_NO_OPT
+        batch_size = BATCH_SIZE_NO_OPT
+        n_epochs = N_EPOCHS_NO_OPT
+        scheduler_name = SCHEDULER_NAME_NO_OPT
+
 
     # Creating the activation functions from their names
     if hidden_activation_name == "ReLU":
@@ -401,7 +423,7 @@ def create_model(trial, optimize):
         scheduler = None
 
     # Returning all variables needed for saving and loading
-    return net, loss_fn, optimizer, batch_size, n_epochs, scheduler, loss_name, optimizer_name, scheduler_name, n_units, n_layers, hidden_activation, output_activation
+    return net, loss_fn, optimizer, batch_size, n_epochs, scheduler, loss_name, optimizer_name, scheduler_name, n_units, n_layers, hidden_activation, output_activation, lr
 
 
 #  ## The training and evaluation loop
@@ -662,7 +684,8 @@ def objective(trial):
     n_units, \
     n_layers, \
     hidden_activation, \
-    output_activation = create_model(trial)
+    output_activation, \
+    lr = create_model(trial, optimize=True)
 
     # Training and evaluating the network using the train_and_eval function
     _, _, _, test_metrics = train_and_eval(
@@ -681,7 +704,7 @@ if OPTIMIZE:
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.MedianPruner())
 
     # Running Optuna with 100 trials when we are optimizing.
-    study.optimize(objective, n_trials=100)
+    study.optimize(objective, n_trials=N_TRIALS)
 
     # Printing the best trial information
     print("Best trial:")
@@ -711,7 +734,8 @@ if OPTIMIZE:
     n_units, \
     n_layers, \
     hidden_activation, \
-    output_activation = create_model(trial, optimize=True)
+    output_activation, \
+    lr = create_model(trial, optimize=True)
 # Creating the network with predefined hyperparameters
 else:
     net, \
@@ -726,7 +750,27 @@ else:
     n_units, \
     n_layers, \
     hidden_activation, \
-    output_activation = create_model(trial=None, optimize=False)
+    output_activation, \
+    lr = create_model(trial=None, optimize=False)
+
+
+# In[ ]:
+
+
+print("loss_fn:", loss_fn)
+print("batch_size:", batch_size)
+print("n_epochs:", n_epochs)
+print("scheduler:", scheduler)
+print("loss_name:", loss_name)
+print("optimizer_name:", optimizer_name)
+print("scheduler_name:", scheduler_name)
+print("n_units:", n_units)
+print("n_layers:", n_layers)
+print("hidden_activation:", hidden_activation)
+print("output_activation:", output_activation)
+
+
+# In[ ]:
 
 
 # Training and evaluating the best network using the train_and_eval function
@@ -780,35 +824,114 @@ plt.show()
 # In[ ]:
 
 
-import pickle
+import json
 import pandas as pd
 
-# Saving the best network state dictionary using torch.save
-torch.save(net.state_dict(), "best_net.pth")
+# save the network to a .pth file
+torch.save(net.state_dict(), "net.pth")
 
-# Saving the loss function name using pickle
-with open("loss_fn.pkl", "wb") as f:
-    pickle.dump(loss_name, f)
+# save the optimizer to a .pth file
+torch.save(optimizer.state_dict(), "optimizer.pth")
 
-# Saving the optimizer name and parameters using pickle
-with open("optimizer.pkl", "wb") as f:
-    pickle.dump((optimizer_name, optimizer.state_dict()), f)
+# save the scheduler to a .pth file if it is not None
+if scheduler is not None:
+  torch.save(scheduler.state_dict(), "scheduler.pth")
 
-# Saving the best number of epochs using pickle
-with open("n_epochs.pkl", "wb") as f:
-    pickle.dump(n_epochs, f)
+# create a dictionary to store the rest of the variables
+var_dict = {
+  "batch_size": batch_size,
+  "n_epochs": n_epochs,
+  "loss_name": loss_name,
+  "optimizer_name": optimizer_name,
+  "scheduler_name": scheduler_name,
+  "n_units": n_units,
+  "n_layers": n_layers,
+  "hidden_activation_name": hidden_activation.__class__.__name__,
+  "output_activation_name": output_activation.__class__.__name__,
+  "lr": lr,
+}
 
-# Saving the scheduler name and parameters using pickle
-with open("scheduler.pkl", "wb") as f:
-    pickle.dump((scheduler_name, scheduler.state_dict()), f)
+# save the dictionary to a .json file
+with open("var_dict.json", "w") as f:
+  json.dump(var_dict, f)
 
-# Saving the number of units for each hidden layer using pickle
-with open("n_units.pkl", "wb") as f:
-    pickle.dump(n_units, f)
 
-# Saving the output of create_model using pickle
-with open("create_model.pkl", "wb") as f:
-    pickle.dump((net, loss_fn, optimizer, batch_size, n_epochs, scheduler), f)
+# ## Loading
+
+# In[ ]:
+
+
+# Load the network from the .pth file
+net = Net(n_layers, n_units, hidden_activation, output_activation).to(device)
+net.load_state_dict(torch.load("net.pth"))
+
+# load the optimizer from the .pth file
+if optimizer_name == "SGD":
+  optimizer = optim.SGD(net.parameters(), lr=lr)
+elif optimizer_name == "Adam":
+  optimizer = optim.Adam(net.parameters(), lr=lr)
+elif optimizer_name == "RMSprop":
+  optimizer = optim.RMSprop(net.parameters(), lr=lr)
+else:
+  # Added loading the Adagrad optimizer
+  optimizer = optim.Adagrad(net.parameters(), lr=lr)
+optimizer.load_state_dict(torch.load("optimizer.pth"))
+
+# load the scheduler from the .pth file if it is not None
+if scheduler_name == "StepLR":
+  scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+elif scheduler_name == "ExponentialLR":
+  scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
+elif scheduler_name == "CosineAnnealingLR":
+  # Added loading the CosineAnnealingLR scheduler
+  scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
+elif scheduler_name == "ReduceLROnPlateau":
+  # Added loading the ReduceLROnPlateau scheduler with a threshold value of 0.01
+  #scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+  #    optimizer, mode="min", factor=0.1, patience=10, threshold=0.01
+  #)
+  # Use Dieseldorst et al. settings and add to that a minimum lr.
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer, mode="min", factor=0.5, patience=5, threshold=0.0005, min_lr=1e-6
+                )
+else:
+  scheduler = None
+
+if scheduler is not None:
+  scheduler.load_state_dict(torch.load("scheduler.pth"))
+
+
+# load the dictionary from the .json file
+with open("var_dict.json", "r") as f:
+  var_dict = json.load(f)
+
+# extract the variables from the dictionary
+batch_size = var_dict["batch_size"]
+n_epochs = var_dict["n_epochs"]
+loss_name = var_dict["loss_name"]
+optimizer_name = var_dict["optimizer_name"]
+scheduler_name = var_dict["scheduler_name"]
+n_units = var_dict["n_units"]
+n_layers = var_dict["n_layers"]
+hidden_activation_name = var_dict["hidden_activation_name"]
+output_activation_name = var_dict["output_activation_name"]
+lr = var_dict["lr"]
+
+# create the activation functions from their names
+if hidden_activation_name == "ReLU":
+  hidden_activation = nn.ReLU()
+elif hidden_activation_name == "LeakyReLU":
+  hidden_activation = nn.LeakyReLU() 
+elif hidden_activation_name == "ELU":
+  hidden_activation = nn.ELU() 
+elif hidden_activation_name == "Tanh":
+  hidden_activation = nn.Tanh()
+else:
+  hidden_activation = nn.Sigmoid()
+
+if output_activation_name == "ReLU":
+  output_activation = nn
+
 
 # Saving the output of the training using pandas
 train_df = pd.DataFrame(
@@ -823,11 +946,24 @@ train_df = pd.DataFrame(
 )
 train_df.to_csv("train_output.csv", index=False)
 
+# Loading the output of the training using pandas
+train_df = pd.read_csv("train_output.csv")
+train_losses = train_df["train_loss"].tolist()
+test_losses = train_df["test_loss"].tolist()
+train_metrics = [
+    {
+        "l1_norm": train_df["train_l1_norm"][i],
+        "linf_norm": train_df["train_linf_norm"][i],
+    }
+    for i in range(len(train_df))
+]
+test_metrics = [
+    {
+        "l1_norm": train_df["test_l1_norm"][i],
+        "linf_norm": train_df["test_linf_norm"][i],
+    }
+    for i in range(len(train_df))
+]
 
-# ## Loading
 
-# In[ ]:
-
-
-get_ipython().run_cell_magic('script', 'echo skipping', '\n## Loading the best network state dictionary using torch.load\nstate_dict = torch.load("best_net.pth")\n\n# Loading the state dictionary into a new network instance using net.load_state_dict\nnew_net = Net(n_layers, n_units, hidden_activation, output_activation).to(device)\nnew_net.load_state_dict(state_dict)\n\n\n# In[ ]:\n\n\n# Loading the loss function name using pickle\nwith open("loss_fn.pkl", "rb") as f:\n    loss_name = pickle.load(f)\n\n# Loading the optimizer name and parameters using pickle\nwith open("optimizer.pkl", "rb") as f:\n    optimizer_name, optimizer_state_dict = pickle.load(f)\n\n# Loading the best number of epochs using pickle\nwith open("n_epochs.pkl", "rb") as f:\n    n_epochs = pickle.load(f)\n\n# Loading the scheduler name and parameters using pickle\nwith open("scheduler.pkl", "rb") as f:\n    scheduler_name, scheduler_state_dict = pickle.load(f)\n\n# Loading the number of units for each hidden layer using pickle\nwith open("n_units.pkl", "rb") as f:\n    n_units = pickle.load(f)\n\n# Loading the output of create_model using pickle\nwith open("create_model.pkl", "rb") as f:\n    net, loss_fn, optimizer, batch_size, n_epochs, scheduler = pickle.load(f)\n\n# Loading the output of the training using pandas\ntrain_df = pd.read_csv("train_output.csv")\ntrain_losses = train_df["train_loss"].tolist()\ntest_losses = train_df["test_loss"].tolist()\ntrain_metrics = [\n    {\n        "l1_norm": train_df["train_l1_norm"][i],\n        "linf_norm": train_df["train_linf_norm"][i],\n    }\n    for i in range(len(train_df))\n]\ntest_metrics = [\n    {\n        "l1_norm": train_df["test_l1_norm"][i],\n        "linf_norm": train_df["test_linf_norm"][i],\n    }\n    for i in range(len(train_df))\n]\n')
-
+# ## Porting the model to C++

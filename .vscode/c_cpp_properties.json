@@ -4,16 +4,12 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "G:/2nd_Program_Files/VS/2022/Community/VC/Tools/MSVC/14.35.32215/include",
             ],
             "defines": [
                 "_DEBUG",
                 "UNICODE",
                 "_UNICODE"
             ],
-            "compilerPath": "G:/2nd_Program_Files/VS/2022/Community/VC/Tools/MSVC/14.35.32215/bin/Hostx64/x64/cl.exe",
-            "cStandard": "c11",
-            "cppStandard": "c++20"
         }
     ],
     "version": 4
