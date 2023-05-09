@@ -40,7 +40,7 @@ int main() {
   auto output_tensor = model.forward({input_tensor}).toTensor();
 
   // Printing the output tensor
-  std::cout << "Output: " << output_tensor << "\n";
+  std::cout << "Output: " << output_tensor << "\n"; // Output:  3.3531 [ CPUFloatType{1,1} ]
 
   return 0;
 }
