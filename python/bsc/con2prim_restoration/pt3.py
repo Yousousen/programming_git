@@ -6,7 +6,7 @@
 # 
 # Use this first cell to convert this notebook to a python script.
 
-# In[ ]:
+# In[1]:
 
 
 # Importing the libraries
@@ -26,7 +26,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ## Constants and flags to set
 # Defining some constants and parameters for convenience.
 
-# In[ ]:
+# In[2]:
 
 
 N_TRIALS = 100 # Number of trials for hyperparameter optimization
@@ -57,7 +57,7 @@ np.random.seed(1) # Uncomment for pseudorandom data.
 
 # ## Generating the data
 
-# In[ ]:
+# In[3]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -186,7 +186,7 @@ def generate_labels(n_samples):
     return p
 
 
-# In[ ]:
+# In[4]:
 
 
 # Generating the input and output data for train and test sets using the functions defined
@@ -218,7 +218,7 @@ print("Shape of y_test:", y_test.shape)
 
 # ## Defining the neural network
 
-# In[ ]:
+# In[4]:
 
 
 # Defining a class for the network
@@ -284,7 +284,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[ ]:
+# In[4]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -430,7 +430,7 @@ def create_model(trial, optimize):
 # 
 #  We first define a couple of functions used in the training and evaluation.
 
-# In[ ]:
+# In[8]:
 
 
 # Defining a function that computes loss and metrics for a given batch
@@ -490,7 +490,7 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[ ]:
+# In[9]:
 
 
 # Defining a function to train and evaluate a network
@@ -658,7 +658,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
 # ## The objective function and hyperparameter tuning
 
-# In[ ]:
+# In[10]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -696,7 +696,7 @@ def objective(trial):
     return test_metrics[-1]["l1_norm"]
 
 
-# In[ ]:
+# In[11]:
 
 
 if OPTIMIZE:
@@ -717,7 +717,7 @@ if OPTIMIZE:
 
 # ## Training the model
 
-# In[ ]:
+# In[12]:
 
 
 # Creating the best network and optimizer using the best hyperparameters
@@ -754,7 +754,7 @@ else:
     lr = create_model(trial=None, optimize=False)
 
 
-# In[ ]:
+# In[13]:
 
 
 print("loss_fn:", loss_fn)
@@ -770,7 +770,7 @@ print("hidden_activation:", hidden_activation)
 print("output_activation:", output_activation)
 
 
-# In[ ]:
+# In[14]:
 
 
 # Training and evaluating the network using the train_and_eval function
@@ -781,7 +781,7 @@ train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
 
 # ## Visualizing the results
 
-# In[ ]:
+# In[15]:
 
 
 # Plotting the losses and metrics for the best network 
@@ -821,7 +821,7 @@ plt.show()
 
 # ## Saving
 
-# In[ ]:
+# In[16]:
 
 
 import json
@@ -871,7 +871,7 @@ train_df.to_csv("train_output.csv", index=False)
 
 # ## Loading
 
-# In[ ]:
+# In[5]:
 
 
 import json
@@ -976,7 +976,7 @@ test_metrics_loaded = [
 ]
 
 
-# In[ ]:
+# In[6]:
 
 
 batch_size_loaded
@@ -1001,21 +1001,18 @@ scheduler_loaded
 #test_metrics_loaded
 
 
-# ## Evaluate a loaded network on arbirary input
+# ## Evaluating the network on arbirary input
+# ### Comparing `net` and `net_loaded`
+# 
+# We compare `net` and `net_loaded` to confirm correct loading of the network.
 
-# In[ ]:
-
-
-net_loaded(torch.tensor([1.0, 10.0, 1.0]).to(device))
-
-
-# In[ ]:
+# In[20]:
 
 
 print(list(net.parameters()))
 
 
-# In[ ]:
+# In[10]:
 
 
 print(list(net_loaded.parameters()))
@@ -1026,11 +1023,17 @@ print(list(net_loaded.parameters()))
 
 # Set the network to evaluation mode
 net.eval()
+
+
+# In[24]:
+
+
 # Create arbitrary input
 inputs =  generate_input_data(20)
+inputs
 
 
-# In[ ]:
+# In[23]:
 
 
 # Pass the inputs to the network and get the outputs
@@ -1039,7 +1042,7 @@ outputs = [net(input) for input in inputs]
 outputs
 
 
-# In[ ]:
+# In[24]:
 
 
 # Set the network to evaluation mode
@@ -1052,12 +1055,23 @@ outputs
 
 # ## Porting the model to C++
 
-# In[ ]:
+# In[9]:
 
 
-# Scripting the network using torch.jit.script
-net_scripted = torch.jit.script(net_loaded)
+import torch.jit
 
-# Saving the scripted module to a file using the save method
-net_scripted.save('net_scripted.pt')
+# Creating a dummy input tensor of shape (1, 3) to trace the model
+dummy_input = torch.randn(1, 3).to(device)
+dummy_input
+
+# Tracing the model using the torch.jit.trace function
+traced_model = torch.jit.trace(net_loaded, dummy_input)
+
+# Saving the traced model to a file named "net.pt"
+traced_model.save("cpp/build/net.pt")
+
+
+example_input_to_validate_correct_export_and_import = generate_input_data(1)
+example_input_to_validate_correct_export_and_import
+net_loaded(example_input_to_validate_correct_export_and_import)
 
