@@ -23,7 +23,10 @@ int main() {
 
   // Setting the device accordingly
   //at::Device device = cuda_available ? at::kCUDA : at::kCPU;
-  at::Device device = at::kCPU;
+  //at::Device device = at::kCPU;
+
+  // Moving the model to the same device as the input tensor
+  model.to(at::kCPU);
 
 
   // Converting the input data from python to C++ using torch::from_blob function
@@ -31,7 +34,7 @@ int main() {
   auto input_tensor = torch::from_blob(input_data, {1, 3});
 
   // Moving the input tensor to the same device as the model
-  input_tensor = input_tensor.to(model.device());
+  input_tensor = input_tensor.to(at::kCPU);
 
   // Evaluating the model on the input tensor using the forward method
   auto output_tensor = model.forward({input_tensor}).toTensor();
