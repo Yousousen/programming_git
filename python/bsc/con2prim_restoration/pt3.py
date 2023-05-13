@@ -6,7 +6,7 @@
 # 
 # Use this first cell to convert this notebook to a python script.
 
-# In[1]:
+# In[ ]:
 
 
 # Importing the libraries
@@ -26,7 +26,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ## Constants and flags to set
 # Defining some constants and parameters for convenience.
 
-# In[2]:
+# In[ ]:
 
 
 N_TRIALS = 100 # Number of trials for hyperparameter optimization
@@ -39,7 +39,7 @@ HIDDEN_ACTIVATION_NAME_NO_OPT = "Sigmoid"
 OUTPUT_ACTIVATION_NAME_NO_OPT = "ReLU"
 LOSS_NAME_NO_OPT = "MSE"
 OPTIMIZER_NAME_NO_OPT = "Adam"
-LR_NO_OPT = 6e-4
+LR_NO_OPT = 6e-3
 BATCH_SIZE_NO_OPT = 32
 N_EPOCHS_NO_OPT = 30
 SCHEDULER_NAME_NO_OPT = "ReduceLROnPlateau"
@@ -57,7 +57,7 @@ np.random.seed(1) # Uncomment for pseudorandom data.
 
 # ## Generating the data
 
-# In[3]:
+# In[ ]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -186,7 +186,7 @@ def generate_labels(n_samples):
     return p
 
 
-# In[4]:
+# In[ ]:
 
 
 # Generating the input and output data for train and test sets using the functions defined
@@ -218,7 +218,7 @@ print("Shape of y_test:", y_test.shape)
 
 # ## Defining the neural network
 
-# In[4]:
+# In[ ]:
 
 
 # Defining a class for the network
@@ -262,7 +262,6 @@ class Net(nn.Module):
         assert isinstance(hidden_activation, nn.Module), "hidden_activation must be a torch.nn.Module"
         assert isinstance(output_activation, nn.Module), "output_activation must be a torch.nn.Module"
 
-    #@torch.jit.script_method
     def forward(self, x):
         """Performs a forward pass on the input tensor.
 
@@ -284,7 +283,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[4]:
+# In[ ]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -430,7 +429,7 @@ def create_model(trial, optimize):
 # 
 #  We first define a couple of functions used in the training and evaluation.
 
-# In[8]:
+# In[ ]:
 
 
 # Defining a function that computes loss and metrics for a given batch
@@ -490,7 +489,7 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[9]:
+# In[ ]:
 
 
 # Defining a function to train and evaluate a network
@@ -658,7 +657,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
 # ## The objective function and hyperparameter tuning
 
-# In[10]:
+# In[ ]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -696,7 +695,7 @@ def objective(trial):
     return test_metrics[-1]["l1_norm"]
 
 
-# In[11]:
+# In[ ]:
 
 
 if OPTIMIZE:
@@ -717,7 +716,7 @@ if OPTIMIZE:
 
 # ## Training the model
 
-# In[12]:
+# In[ ]:
 
 
 # Creating the best network and optimizer using the best hyperparameters
@@ -754,7 +753,7 @@ else:
     lr = create_model(trial=None, optimize=False)
 
 
-# In[13]:
+# In[ ]:
 
 
 print("loss_fn:", loss_fn)
@@ -770,7 +769,7 @@ print("hidden_activation:", hidden_activation)
 print("output_activation:", output_activation)
 
 
-# In[14]:
+# In[ ]:
 
 
 # Training and evaluating the network using the train_and_eval function
@@ -781,7 +780,7 @@ train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
 
 # ## Visualizing the results
 
-# In[15]:
+# In[ ]:
 
 
 # Plotting the losses and metrics for the best network 
@@ -821,7 +820,7 @@ plt.show()
 
 # ## Saving
 
-# In[16]:
+# In[ ]:
 
 
 import json
@@ -871,7 +870,7 @@ train_df.to_csv("train_output.csv", index=False)
 
 # ## Loading
 
-# In[5]:
+# In[ ]:
 
 
 import json
@@ -976,7 +975,7 @@ test_metrics_loaded = [
 ]
 
 
-# In[6]:
+# In[ ]:
 
 
 batch_size_loaded
@@ -1006,13 +1005,13 @@ scheduler_loaded
 # 
 # We compare `net` and `net_loaded` to confirm correct loading of the network.
 
-# In[20]:
+# In[ ]:
 
 
 print(list(net.parameters()))
 
 
-# In[10]:
+# In[ ]:
 
 
 print(list(net_loaded.parameters()))
@@ -1025,7 +1024,7 @@ print(list(net_loaded.parameters()))
 net.eval()
 
 
-# In[24]:
+# In[ ]:
 
 
 # Create arbitrary input
@@ -1033,7 +1032,7 @@ inputs =  generate_input_data(20)
 inputs
 
 
-# In[23]:
+# In[ ]:
 
 
 # Pass the inputs to the network and get the outputs
@@ -1042,7 +1041,7 @@ outputs = [net(input) for input in inputs]
 outputs
 
 
-# In[24]:
+# In[ ]:
 
 
 # Set the network to evaluation mode
@@ -1055,7 +1054,7 @@ outputs
 
 # ## Porting the model to C++
 
-# In[9]:
+# In[ ]:
 
 
 import torch.jit

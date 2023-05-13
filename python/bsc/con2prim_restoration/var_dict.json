@@ -1,1 +1,1 @@
-{"batch_size": 32, "n_epochs": 30, "loss_name": "MSE", "optimizer_name": "Adam", "scheduler_name": "ReduceLROnPlateau", "n_units": [600, 200], "n_layers": 2, "hidden_activation_name": "Sigmoid", "output_activation_name": "ReLU", "lr": 0.0006}
+{"batch_size": 32, "n_epochs": 30, "loss_name": "MSE", "optimizer_name": "Adam", "scheduler_name": "ReduceLROnPlateau", "n_units": [600, 200], "n_layers": 2, "hidden_activation_name": "Sigmoid", "output_activation_name": "ReLU", "lr": 0.006}
