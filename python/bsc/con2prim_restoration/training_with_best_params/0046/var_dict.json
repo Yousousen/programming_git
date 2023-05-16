@@ -1,0 +1,1 @@
+{"batch_size": 47, "n_epochs": 400, "loss_name": "Huber", "optimizer_name": "Adam", "scheduler_name": "ExponentialLR", "n_units": [66, 193, 248], "n_layers": 3, "hidden_activation_name": "LeakyReLU", "output_activation_name": "ReLU", "lr": 0.0009376919782324494}
