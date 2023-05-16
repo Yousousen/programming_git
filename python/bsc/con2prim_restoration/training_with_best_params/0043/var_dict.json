@@ -1,0 +1,1 @@
+{"batch_size": 223, "n_epochs": 400, "loss_name": "MAE", "optimizer_name": "Adam", "scheduler_name": "ReduceLROnPlateau", "n_units": [86, 201, 87], "n_layers": 3, "hidden_activation_name": "ReLU", "output_activation_name": "Identity", "lr": 0.0007324856218845869}

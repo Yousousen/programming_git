@@ -1,0 +1,1 @@
+{"batch_size": 55, "n_epochs": 400, "loss_name": "Huber", "optimizer_name": "Adam", "scheduler_name": "ReduceLROnPlateau", "n_units": [172, 249], "n_layers": 2, "hidden_activation_name": "LeakyReLU", "output_activation_name": "Identity", "lr": 0.0001468891993074274}
