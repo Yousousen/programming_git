@@ -1,0 +1,1 @@
+{"batch_size": 16, "n_epochs": 400, "loss_name": "MSE", "optimizer_name": "Adagrad", "scheduler_name": "CosineAnnealingLR", "n_units": [617, 858, 720, 989, 613], "n_layers": 5, "hidden_activation_name": "ReLU", "output_activation_name": "ReLU", "lr": 0.0016884179922857007}
