@@ -1,0 +1,1 @@
+{"batch_size": 20, "n_epochs": 400, "loss_name": "MAE", "optimizer_name": "Adagrad", "scheduler_name": "None", "n_units": [950], "n_layers": 1, "hidden_activation_name": "ReLU", "output_activation_name": "ReLU", "lr": 0.006366353285930649}
