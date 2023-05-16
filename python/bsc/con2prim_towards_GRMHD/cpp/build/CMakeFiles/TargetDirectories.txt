@@ -1,0 +1,3 @@
+/home2/yousousen/programming_git/python/bsc/con2prim_restoration/cpp/build/CMakeFiles/pt3.dir
+/home2/yousousen/programming_git/python/bsc/con2prim_restoration/cpp/build/CMakeFiles/edit_cache.dir
+/home2/yousousen/programming_git/python/bsc/con2prim_restoration/cpp/build/CMakeFiles/rebuild_cache.dir
