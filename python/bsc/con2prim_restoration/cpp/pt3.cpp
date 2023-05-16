@@ -2,16 +2,19 @@
 #include <iostream>
 
 int main() {
+  // Set the path to the net.pt file.
+  char path_to_model[] = "../../net.pt";
+
   // Declaring a variable to store the model
   torch::jit::script::Module model;
 
   // Loading the model from the file "net.pt" using the torch::jit::load function
   try {
     // Deserialize the ScriptModule from a file using torch::jit::load().
-    model = torch::jit::load("net.pt");
+    model = torch::jit::load(path_to_model);
   }
   catch (const c10::Error& e) {
-    std::cerr << "error loading the model\n";
+    std::cerr << "error loading the model, did you correctly set the path to the net.pt file?\n";
     return -1;
   }
 
@@ -30,7 +33,7 @@ int main() {
 
 
   // Converting the input data from python to C++ using torch::from_blob function
-  float input_data[] = {3.0708, 0.4283, 0.5976};
+  float input_data[] = {4.6177, 0.3018, 2.3998};
   auto input_tensor = torch::from_blob(input_data, {1, 3});
 
   // Moving the input tensor to the same device as the model
@@ -40,7 +43,7 @@ int main() {
   auto output_tensor = model.forward({input_tensor}).toTensor();
 
   // Printing the output tensor
-  std::cout << "Output: " << output_tensor << "\n"; // Output:  3.3531 [ CPUFloatType{1,1} ]
+  std::cout << "Output: " << output_tensor << "\n";
 
   return 0;
 }
