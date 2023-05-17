@@ -102,7 +102,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 N_TRIALS = 250 # Number of trials for hyperparameter optimization
 OPTIMIZE = False # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
-ZSCORE_NORMALIZATION = False # Whether to z-score normalize the input data.
+ZSCORE_NORMALIZATION = True # Whether to z-score normalize the input data.
 
 # I try out here the values as obtained in Optuna run 5, but I will increase the number of epochs.
 # N_LAYERS_NO_OPT = 3
@@ -131,11 +131,11 @@ c = 1  # Speed of light (used in compute_conserved_variables and sample_primitiv
 gamma = 5 / 3  # Adiabatic index (used in eos_analytic function)
 n_train_samples = 80000 # Number of training samples (used in generate_input_data and generate_labels functions)
 n_test_samples = 10000 # Number of test samples (used in generate_input_data and generate_labels functions)
-rho_interval = (0, 10.1) # Sampling interval for rest-mass density (used in sample_primitive_variables function)
-vx_interval = (0, 0.721 * c) # Sampling interval for velocity in x-direction (used in sample_primitive_variables function)
-vy_interval = (0, 0.721 * c) # Sampling interval for velocity in y-direction (used in sample_primitive_variables function)
-vz_interval = (0, 0.721 * c) # Sampling interval for velocity in z-direction (used in sample_primitive_variables function)
-epsilon_interval = (0, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
+rho_interval = (0.1, 10.1) # Sampling interval for rest-mass density (used in sample_primitive_variables function)
+vx_interval = (0.1, 0.721 * c) # Sampling interval for velocity in x-direction (used in sample_primitive_variables function)
+vy_interval = (0.1, 0.721 * c) # Sampling interval for velocity in y-direction (used in sample_primitive_variables function)
+vz_interval = (0.1, 0.721 * c) # Sampling interval for velocity in z-direction (used in sample_primitive_variables function)
+epsilon_interval = (0.1, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
 
 np.random.seed(41) # Uncomment for pseudorandom data.
 
@@ -273,10 +273,25 @@ rho_test, vx_test ,vy_test ,vz_test ,epsilon_test = sample_primitive_variables(n
 # In[9]:
 
 
-get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
+rho_train
+vx_train
+vy_train
+vz_train 
+epsilon_train
+rho_test
+vx_test 
+vy_test 
+vz_test 
+epsilon_test
 
 
 # In[10]:
+
+
+get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
+
+
+# In[11]:
 
 
 # Plotting the histograms of rho, vx and epsilon
@@ -312,7 +327,13 @@ plt.show()
 
 
 
-# In[11]:
+# In[12]:
+
+
+get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
+
+
+# In[13]:
 
 
 # Generating the input and output data for train and test sets.
@@ -322,9 +343,24 @@ x_test = generate_input_data(rho_test, vx_test, vy_test, vz_test, epsilon_test)
 y_test = generate_labels(rho_test, epsilon_test) 
 
 
+# In[14]:
+
+
+x_train
+y_train
+x_test
+y_test
+
+
 # Plotting the histograms of the input data before normalization
 
-# In[12]:
+# In[15]:
+
+
+get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
+
+
+# In[16]:
 
 
 plt.figure(figsize=(16, 4))
@@ -360,7 +396,13 @@ plt.show()
 
 # Perform z-score normalization
 
-# In[34]:
+# In[17]:
+
+
+get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
+
+
+# In[ ]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -390,9 +432,17 @@ if ZSCORE_NORMALIZATION:
     x_test[:, 4] = torch.sub(x_test[:, 4], tau_mean).div(tau_std)
 
 
+# In[20]:
+
+
+x_train[:, 0]
+x_train.shape
+x_test
+
+
 # Verifying that the means and the stds of the input data are close to 0 and 1 respectively.
 
-# In[13]:
+# In[ ]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -410,7 +460,13 @@ if ZSCORE_NORMALIZATION:
 
 # Plotting the histograms of the input data after normalization if z-score normalization was performed.
 
-# In[14]:
+# In[ ]:
+
+
+get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
+
+
+# In[ ]:
 
 
 plt.figure(figsize=(16, 4))
@@ -446,7 +502,7 @@ plt.show()
 
 # Checking if our output is always positive by plotting a histogram of y_train and y_test tensors 
 
-# In[15]:
+# In[ ]:
 
 
 plt.figure(figsize=(8, 4))
@@ -464,7 +520,7 @@ plt.tight_layout()
 plt.show()
 
 
-# In[16]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -472,7 +528,7 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 # ## Defining the neural network
 
-# In[9]:
+# In[ ]:
 
 
 # Defining a class for the network
@@ -541,7 +597,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[60]:
+# In[ ]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -750,7 +806,7 @@ def create_model(trial, optimize):
 # 
 #  We first define a couple of functions used in the training and evaluation.
 
-# In[61]:
+# In[ ]:
 
 
 # Defining a function that computes loss and metrics for a given batch
@@ -810,7 +866,7 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[62]:
+# In[ ]:
 
 
 # Defining a function to train and evaluate a network
@@ -978,7 +1034,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
 # ## The objective function and hyperparameter tuning
 
-# In[63]:
+# In[ ]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -1016,7 +1072,7 @@ def objective(trial):
     return test_metrics[-1]["l1_norm"]
 
 
-# In[64]:
+# In[ ]:
 
 
 if OPTIMIZE:
@@ -1037,7 +1093,7 @@ if OPTIMIZE:
 
 # ## Training the model
 
-# In[65]:
+# In[ ]:
 
 
 # Creating the best network and optimizer using the best hyperparameters
@@ -1074,7 +1130,7 @@ else:
     lr = create_model(trial=None, optimize=False)
 
 
-# In[66]:
+# In[ ]:
 
 
 print("loss_fn:", loss_fn)
@@ -1090,7 +1146,7 @@ print("hidden_activation:", hidden_activation)
 print("output_activation:", output_activation)
 
 
-# In[67]:
+# In[ ]:
 
 
 # Training and evaluating the network using the train_and_eval function
@@ -1101,7 +1157,7 @@ train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
 
 # ## Saving
 
-# In[69]:
+# In[ ]:
 
 
 import json
@@ -1156,7 +1212,7 @@ save_file("train_output.csv")
 
 # ## Visualizing the results
 
-# In[70]:
+# In[ ]:
 
 
 # Plotting the losses and metrics for the best network 
@@ -1208,7 +1264,7 @@ plt.show()
 
 # ## Loading
 
-# In[24]:
+# In[ ]:
 
 
 import json
@@ -1360,13 +1416,13 @@ test_metrics_loaded = [
 ]
 
 
-# In[38]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\nbatch_size_loaded\nn_epochs_loaded\nloss_name_loaded\noptimizer_name_loaded\nscheduler_name_loaded\nn_units_loaded\nn_layers_loaded\nhidden_activation_name_loaded\noutput_activation_name_loaded\nlr_loaded\nhidden_activation_loaded\noutput_activation_loaded\nnet_loaded\nnet_loaded.__dict__ # print the subparameters of the network\nloss_fn_loaded\noptimizer_loaded\noptimizer_loaded.__dict__ # print the subparameters of the optimizer\nscheduler_loaded\nscheduler_loaded.__dict__ # print the subparameters of the scheduler\ntrain_losses_loaded\ntest_losses_loaded\ntrain_metrics_loaded\ntest_metrics_loaded\n')
 
 
-# In[59]:
+# In[ ]:
 
 
 train_losses_loaded[-1]
@@ -1381,13 +1437,13 @@ print(f'Error is {test_metrics_loaded[-1]["linf_norm"] / (8.14e-3)} times bigger
 
 # Let us verify correct loading of the train and test metrics by visualizing them again but now through the loaded values. Likewise for the train and test losses.
 
-# In[26]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[27]:
+# In[ ]:
 
 
 # Plotting the losses and metrics for the best network plt.figure(figsize=(12, 
@@ -1436,7 +1492,7 @@ plt.legend()
 plt.show()
 
 
-# In[28]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -1447,25 +1503,25 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 # 
 # We compare `net` and `net_loaded` to confirm correct loading of the network. Note that `net` is only available if we have trained the model in this session.
 
-# In[29]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\nprint(list(net.parameters()))\n')
 
 
-# In[30]:
+# In[ ]:
 
 
 print(list(net_loaded.parameters()))
 
 
-# In[31]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n# Set the network to evaluation mode\nnet.eval()\n')
 
 
-# In[32]:
+# In[ ]:
 
 
 rho_example, vx_example, vy_example, vz_example, epsilon_example = sample_primitive_variables(20)
@@ -1475,20 +1531,20 @@ inputs =  generate_input_data(rho_example, vx_example, vy_example, vz_example, e
 inputs
 
 
-# In[33]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n# Pass the inputs to the network and get the outputs\noutputs = [net(input) for input in inputs]\n# Print the outputs\noutputs\n')
 
 
-# In[34]:
+# In[ ]:
 
 
 # Set the network to evaluation mode
 net_loaded.eval()
 
 
-# In[35]:
+# In[ ]:
 
 
 # Pass the inputs to the network and get the outputs
@@ -1499,7 +1555,7 @@ outputs
 
 # ## Porting the model to C++
 
-# In[23]:
+# In[ ]:
 
 
 import torch.jit
