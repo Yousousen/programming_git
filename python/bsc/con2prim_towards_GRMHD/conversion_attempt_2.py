@@ -39,7 +39,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[2]:
+# In[ ]:
 
 
 import os
@@ -62,13 +62,13 @@ def save_file(file_name):
     pass
 
 
-# In[3]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
 
 
-# In[4]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX\n')
@@ -76,7 +76,7 @@ get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna t
 
 # Importing the **libraries** and setting the **device**,
 
-# In[5]:
+# In[ ]:
 
 
 import numpy as np
@@ -97,12 +97,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # 
 # **NOTE**: Some **subparameters** still need to be adjusted in the `create_model` function itself as of (Tue May 16 07:42:45 AM CEST 2023).
 
-# In[6]:
+# In[ ]:
 
 
 N_TRIALS = 250 # Number of trials for hyperparameter optimization
 OPTIMIZE = False # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
-ZSCORE_NORMALIZATION = True # Whether to z-score normalize the input data.
+ZSCORE_NORMALIZATION = False # Whether to z-score normalize the input data.
 
 # I try out here the values as obtained in Optuna run 5, but I will increase the number of epochs.
 # N_LAYERS_NO_OPT = 3
@@ -136,13 +136,16 @@ vx_interval = (0.1, 0.721 * c) # Sampling interval for velocity in x-direction (
 vy_interval = (0.1, 0.721 * c) # Sampling interval for velocity in y-direction (used in sample_primitive_variables function)
 vz_interval = (0.1, 0.721 * c) # Sampling interval for velocity in z-direction (used in sample_primitive_variables function)
 epsilon_interval = (0.1, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
+SMALL_CONSTANT = 1e-8 # Small constant to avoid possible division by zero in the calculation of W.
+FILTER_INFS = True # Whether to filter out infinities in the input data.
+FILTER_INVALID_VALS = True # Whether to filter out infinities in the input data.
 
 np.random.seed(41) # Uncomment for pseudorandom data.
 
 
 # ## Generating the data
 
-# In[7]:
+# In[ ]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -156,7 +159,8 @@ def eos_analytic(rho, epsilon):
     Returns:
         torch.Tensor: The pressure tensor of shape (n_samples,).
     """
-    # Adding some assertions to check that the input tensors are valid and have the expected shape and type 
+    # Adding some assertions to check that the input tensors are valid and have 
+    # the expected shape and type 
     assert isinstance(rho, torch.Tensor), "rho must be a torch.Tensor"
     assert isinstance(epsilon, torch.Tensor), "epsilon must be a torch.Tensor"
     assert rho.shape == epsilon.shape, "rho and epsilon must have the same shape"
@@ -164,6 +168,7 @@ def eos_analytic(rho, epsilon):
     assert rho.dtype == torch.float32, "rho and epsilon must have dtype torch.float32"
 
     return (gamma - 1) * rho * epsilon
+
 
 
 # Defining a function that samples primitive variables from uniform distributions
@@ -181,15 +186,29 @@ def sample_primitive_variables(n_samples):
             epsilon is specific internal energy,
             each being a numpy array of shape (n_samples,).
     """
-    # Sampling from uniform distributions with intervals matching Dieseldorst et al.
+    # Sampling from uniform distributions with intervals matching Dieseldorst 
+    # et al.
     rho = np.random.uniform(*rho_interval, size=n_samples)  # Rest-mass density
     vx = np.random.uniform(*vx_interval, size=n_samples)  # Velocity in x-direction
     vy = np.random.uniform(*vy_interval, size=n_samples)  # Velocity in y-direction
     vz = np.random.uniform(*vz_interval, size=n_samples)  # Velocity in z-direction 
     epsilon = np.random.uniform(*epsilon_interval, size=n_samples)  # Specific internal energy
 
+
+    if FILTER_INVALID_VALS:
+        # Checking for other invalid values in the primitive variables using logical operators
+        valid_mask = (rho > 0) & (vx < c) & (vy < c) & (vz < c) & (epsilon > 0)
+
+        # Filtering out the invalid values using the valid_mask
+        rho = rho[valid_mask]
+        vx = vx[valid_mask]
+        vy = vy[valid_mask]
+        vz = vz[valid_mask]
+        epsilon = epsilon[valid_mask]
+
     # Returning the primitive variables
     return rho, vx, vy, vz, epsilon
+
 
 
 # Defining a function that computes conserved variables from primitive variables
@@ -212,11 +231,11 @@ def compute_conserved_variables(rho, vx, vy, vz, epsilon):
             each being a torch tensor of shape (n_samples,).
     """
 
-    # Computing the pressure from the primitive variables using the EOS
+  # Computing the pressure from the primitive variables using the EOS
     p = eos_analytic(rho, epsilon)
     # Computing the Lorentz factor from the velocity.
     v2 = vx ** 2 + vy ** 2 + vz ** 2
-    W = 1 / torch.sqrt(1 - v2 / c ** 2)
+    W = 1 / torch.sqrt(1 - v2 / c ** 2 + SMALL_CONSTANT)
     # Specific enthalpy
     h = 1 + epsilon + p / rho  
 
@@ -239,6 +258,18 @@ def generate_input_data(rho, vx, vy, vz, epsilon):
     vz = torch.tensor(vz, dtype=torch.float32).to(device)
     epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
 
+    if FILTER_INFS:
+        # Checking the validity of the primitive variables using torch.isfinite function
+        valid_mask = torch.isfinite(rho) & torch.isfinite(vx) & torch.isfinite(vy) & torch.isfinite(vz)
+
+        # Filtering out the invalid values using the valid_mask
+        rho = rho[valid_mask]
+        vx = vx[valid_mask]
+        vy = vy[valid_mask]
+        vz = vz[valid_mask]
+        epsilon = epsilon[valid_mask]
+
+
     # Computing the conserved variables using the compute_conserved_variables function
     D, Sx, Sy, Sz, tau = compute_conserved_variables(rho, vx, vy, vz, epsilon) 
 
@@ -254,6 +285,14 @@ def generate_labels(rho, epsilon):
     rho = torch.tensor(rho, dtype=torch.float32).to(device)
     epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
 
+    if FILTER_INFS:
+        # Checking the validity of the primitive variables using torch.isfinite function
+        valid_mask = torch.isfinite(rho) & torch.isfinite(epsilon)
+
+        # Filtering out the invalid values using the valid_mask
+        rho = rho[valid_mask]
+        epsilon = epsilon[valid_mask]
+   
     # Computing the pressure from the primitive variables using the EOS
     p = eos_analytic(rho, epsilon)
 
@@ -263,14 +302,14 @@ def generate_labels(rho, epsilon):
 
 # Sampling the primitive variables using the sample_primitive_variables function
 
-# In[8]:
+# In[ ]:
 
 
 rho_train, vx_train, vy_train, vz_train ,epsilon_train = sample_primitive_variables(n_train_samples)
 rho_test, vx_test ,vy_test ,vz_test ,epsilon_test = sample_primitive_variables(n_test_samples)
 
 
-# In[9]:
+# In[ ]:
 
 
 rho_train
@@ -285,13 +324,63 @@ vz_test
 epsilon_test
 
 
-# In[10]:
+# In[ ]:
+
+
+if FILTER_INVALID_VALS:
+    # Sampling the primitive variables using the sample_primitive_variables function
+    rho_train, vx_train, vy_train, vz_train ,epsilon_train = sample_primitive_variables(n_train_samples)
+    rho_test, vx_test ,vy_test ,vz_test ,epsilon_test = sample_primitive_variables(n_test_samples)
+
+    # Checking for other invalid values in the train set using logical operators
+    valid_mask_train = (rho_train > 0) & (vx_train < c) & (vy_train < c) & (vz_train < c) & (epsilon_train > 0)
+
+    # Filtering out the invalid values from the train set using the valid_mask
+    rho_train = rho_train[valid_mask_train]
+    vx_train = vx_train[valid_mask_train]
+    vy_train = vy_train[valid_mask_train]
+    vz_train = vz_train[valid_mask_train]
+    epsilon_train = epsilon_train[valid_mask_train]
+
+    # Checking for other invalid values in the test set using logical operators
+    valid_mask_test = (rho_test > 0) & (vx_test < c) & (vy_test < c) & (vz_test < c) & (epsilon_test > 0)
+
+    # Filtering out the invalid values from the test set using the valid_mask
+    rho_test = rho_test[valid_mask_test]
+    vx_test = vx_test[valid_mask_test]
+    vy_test = vy_test[valid_mask_test]
+    vz_test = vz_test[valid_mask_test]
+    epsilon_test = epsilon_test[valid_mask_test]
+
+    # Generating the input and output data for train and test sets.
+    x_train = generate_input_data(rho_train ,vx_train ,vy_train, vz_train, epsilon_train)
+    y_train = generate_labels(rho_train, epsilon_train) 
+    x_test = generate_input_data(rho_test, vx_test, vy_test, vz_test, epsilon_test)
+    y_test = generate_labels(rho_test, epsilon_test) 
+
+
+# In[ ]:
+
+
+rho_train
+vx_train
+vy_train
+vz_train 
+epsilon_train
+rho_test
+vx_test 
+vy_test 
+vz_test 
+epsilon_test
+
+
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[11]:
+# In[ ]:
 
 
 # Plotting the histograms of rho, vx and epsilon
@@ -327,23 +416,23 @@ plt.show()
 
 
 
-# In[12]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
 
 
-# In[13]:
+# In[ ]:
 
 
 # Generating the input and output data for train and test sets.
-x_train = generate_input_data(rho_train ,vx_train ,vy_train, vz_train, epsilon_train)
+x_train = generate_input_data(rho_train, vx_train ,vy_train, vz_train, epsilon_train)
 y_train = generate_labels(rho_train, epsilon_train) 
 x_test = generate_input_data(rho_test, vx_test, vy_test, vz_test, epsilon_test)
 y_test = generate_labels(rho_test, epsilon_test) 
 
 
-# In[14]:
+# In[ ]:
 
 
 x_train
@@ -352,51 +441,40 @@ x_test
 y_test
 
 
-# Plotting the histograms of the input data before normalization
-
-# In[15]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[16]:
+# In[ ]:
 
 
-plt.figure(figsize=(16, 4))
-plt.subplot(1, 5, 1)
-plt.hist(x_train[:, 0].cpu().numpy(), bins=20)
-plt.xlabel("D")
-plt.ylabel("Frequency")
-plt.yscale("log")
-plt.subplot(1, 5, 2)
-plt.hist(x_train[:, 1].cpu().numpy(), bins=20)
-plt.xlabel("Sx")
-plt.ylabel("Frequency")
-plt.yscale("log")
-plt.subplot(1, 5, 3)
-plt.hist(x_train[:, 2].cpu().numpy(), bins=20)
-plt.xlabel("Sy")
-plt.ylabel("Frequency")
-plt.yscale("log")
-plt.subplot(1, 5, 4)
-plt.hist(x_train[:, 3].cpu().numpy(), bins=20)
-plt.xlabel("Sz")
-plt.ylabel("Frequency")
-plt.yscale("log")
-plt.subplot(1, 5, 5)
-plt.hist(x_train[:, 4].cpu().numpy(), bins=20)
-plt.xlabel("tau")
-plt.ylabel("Frequency")
-plt.yscale("log")
-plt.suptitle("Input data before normalization")
-plt.tight_layout()
+# Plotting histograms of the input variables before z-score normalization
+plt.figure(figsize=(10, 10))
+plt.suptitle('Histograms of input variables before z-score normalization')
+for i in range(5):
+    plt.subplot(3, 2, i+1)
+    plt.hist(x_train[:, i], bins=50)
+    plt.xlabel(f'Variable {i}')
 plt.show()
+
+
+# In[ ]:
+
+
+# Computing summary statistics of the input variables before and after z-score normalization
+print('Summary statistics of input variables before z-score normalization')
+print(torch.stack([torch.min(x_train, dim=0).values,
+                   torch.max(x_train, dim=0).values,
+                   torch.nanmean(x_train, dim=0), # Modified by Bing
+                   torch.median(x_train, dim=0).values,
+                   torch.nanstd(x_train, dim=0)], dim=1)) # Modified by Bing
 
 
 # Perform z-score normalization
 
-# In[17]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -406,56 +484,49 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 
 if ZSCORE_NORMALIZATION:
-    # Computing the mean and standard deviation of each input variable from the training set
-    D_mean = torch.mean(x_train[:, 0])
-    D_std = torch.std(x_train[:, 0])
-    Sx_mean = torch.mean(x_train[:, 1])
-    Sx_std = torch.std(x_train[:, 1])
-    Sy_mean = torch.mean(x_train[:, 2])
-    Sy_std = torch.std(x_train[:, 2])
-    Sz_mean = torch.mean(x_train[:, 3])
-    Sz_std = torch.std(x_train[:, 3])
-    tau_mean = torch.mean(x_train[:, 4])
-    tau_std = torch.std(x_train[:, 4])
+    
+    # Computing the median of each input variable from the training set using torch.nanmedian function
+    D_median = torch.nanmedian(x_train[:, 0])
+    Sx_median = torch.nanmedian(x_train[:, 1])
+    Sy_median = torch.nanmedian(x_train[:, 2])
+    Sz_median = torch.nanmedian(x_train[:, 3])
+    tau_median = torch.nanmedian(x_train[:, 4])
+
+    # Computing the standard deviation of each input variable from the training set using torch.std function with a boolean mask to ignore nan values
+    D_std = torch.std(x_train[~torch.isnan(x_train[:, 0]), 0])
+    Sx_std = torch.std(x_train[~torch.isnan(x_train[:, 1]), 1])
+    Sy_std = torch.std(x_train[~torch.isnan(x_train[:, 2]), 2])
+    Sz_std = torch.std(x_train[~torch.isnan(x_train[:, 3]), 3])
+    tau_std = torch.std(x_train[~torch.isnan(x_train[:, 4]), 4])
+
 
     # Applying z-score normalization to both train and test sets using the statistics from the training set
-    x_train[:, 0] = torch.sub(x_train[:, 0], D_mean).div(D_std)
-    x_train[:, 1] = torch.sub(x_train[:, 1], Sx_mean).div(Sx_std)
-    x_train[:, 2] = torch.sub(x_train[:, 2], Sy_mean).div(Sy_std)
-    x_train[:, 3] = torch.sub(x_train[:, 3], Sz_mean).div(Sz_std)
-    x_train[:, 4] = torch.sub(x_train[:, 4], tau_mean).div(tau_std)
+    x_train[:, 0] = torch.sub(x_train[:, 0], D_median).div(D_std)
+    x_train[:, 1] = torch.sub(x_train[:, 1], Sx_median).div(Sx_std)
+    x_train[:, 2] = torch.sub(x_train[:, 2], Sy_median).div(Sy_std)
+    x_train[:, 3] = torch.sub(x_train[:, 3], Sz_median).div(Sz_std)
+    x_train[:, 4] = torch.sub(x_train[:, 4], tau_median).div(tau_std)
 
-    x_test[:, 0] = torch.sub(x_test[:, 0], D_mean).div(D_std)
-    x_test[:, 1] = torch.sub(x_test[:, 1], Sx_mean).div(Sx_std)
-    x_test[:, 2] = torch.sub(x_test[:, 2], Sy_mean).div(Sy_std)
-    x_test[:, 3] = torch.sub(x_test[:, 3], Sz_mean).div(Sz_std)
-    x_test[:, 4] = torch.sub(x_test[:, 4], tau_mean).div(tau_std)
+    x_test[:, 0] = torch.sub(x_test[:, 0], D_median).div(D_std)
+    x_test[:, 1] = torch.sub(x_test[:, 1], Sx_median).div(Sx_std)
+    x_test[:, 2] = torch.sub(x_test[:, 2], Sy_median).div(Sy_std)
+    x_test[:, 3] = torch.sub(x_test[:, 3], Sz_median).div(Sz_std)
+    x_test[:, 4] = torch.sub(x_test[:, 4], tau_median).div(tau_std)
 
-
-# In[20]:
-
-
-x_train[:, 0]
-x_train.shape
-x_test
-
-
-# Verifying that the means and the stds of the input data are close to 0 and 1 respectively.
 
 # In[ ]:
 
 
-if ZSCORE_NORMALIZATION:
-    print(torch.mean(x_train[:, 0]))
-    print(torch.std(x_train[:, 0]))
-    print(torch.mean(x_train[:, 1]))
-    print(torch.std(x_train[:, 1]))
-    print(torch.mean(x_train[:, 2]))
-    print(torch.std(x_train[:, 2]))
-    print(torch.mean(x_train[:, 3]))
-    print(torch.std(x_train[:, 3]))
-    print(torch.mean(x_train[:, 4]))
-    print(torch.std(x_train[:, 4]))
+torch.__version__
+
+
+# In[ ]:
+
+
+x_train[:, 0]
+x_train.shape
+x_train
+x_test
 
 
 # Plotting the histograms of the input data after normalization if z-score normalization was performed.
@@ -469,35 +540,25 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 # In[ ]:
 
 
-plt.figure(figsize=(16, 4))
-plt.subplot(1, 5, 1)
-plt.hist(x_train[:, 0].cpu().numpy(), bins=20)
-plt.xlabel("D")
-plt.ylabel("Frequency")
-plt.yscale("log")
-plt.subplot(1, 5, 2)
-plt.hist(x_train[:, 1].cpu().numpy(), bins=20)
-plt.xlabel("Sx")
-plt.ylabel("Frequency")
-plt.yscale("log")
-plt.subplot(1, 5, 3)
-plt.hist(x_train[:, 2].cpu().numpy(), bins=20)
-plt.xlabel("Sy")
-plt.ylabel("Frequency")
-plt.yscale("log")
-plt.subplot(1, 5, 4)
-plt.hist(x_train[:, 3].cpu().numpy(), bins=20)
-plt.xlabel("Sz")
-plt.ylabel("Frequency")
-plt.yscale("log")
-plt.subplot(1, 5, 5)
-plt.hist(x_train[:, 4].cpu().numpy(), bins=20)
-plt.xlabel("tau")
-plt.ylabel("Frequency")
-plt.yscale("log")
-plt.suptitle("Input data after normalization")
-plt.tight_layout()
+# Plotting histograms of the input variables after z-score normalization
+plt.figure(figsize=(10, 10))
+plt.suptitle('Histograms of input variables after z-score normalization')
+for i in range(5):
+    plt.subplot(3, 2, i+1)
+    plt.hist(x_train[:, i], bins=50)
+    plt.xlabel(f'Variable {i}')
 plt.show()
+
+
+# In[ ]:
+
+
+print('Summary statistics of input variables after z-score normalization')
+print(torch.stack([torch.min(x_train, dim=0).values,
+                   torch.max(x_train, dim=0).values,
+                   torch.mean(x_train, dim=0),
+                   torch.median(x_train, dim=0).values,
+                   torch.std(x_train, dim=0)], dim=1))
 
 
 # Checking if our output is always positive by plotting a histogram of y_train and y_test tensors 
