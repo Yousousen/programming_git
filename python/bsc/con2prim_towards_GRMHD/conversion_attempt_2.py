@@ -452,12 +452,13 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 # In[ ]:
 
 
+# Note how we are only plotting train and not test here. 
 # Plotting histograms of the input variables before z-score normalization
 plt.figure(figsize=(10, 10))
 plt.suptitle('Histograms of input variables before z-score normalization')
 for i in range(5):
     plt.subplot(3, 2, i+1)
-    plt.hist(x_train[:, i], bins=50)
+    plt.hist(x_train[:, i].cpu(), bins=50) # Must be converted to cpu() for plotting.
     plt.xlabel(f'Variable {i}')
 plt.show()
 
@@ -568,12 +569,13 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 
 if ZSCORE_NORMALIZATION: 
+    # Note how we are only plotting train and not test here.
     # Plotting histograms of the input variables after z-score normalization
     plt.figure(figsize=(10, 10))
     plt.suptitle('Histograms of input variables after z-score normalization')
     for i in range(5):
         plt.subplot(3, 2, i+1)
-        plt.hist(x_train[:, i], bins=50)
+        plt.hist(x_train[:, i].cpu(), bins=50) # Must be convertedhere to cpu() for plotting.
         plt.xlabel(f'Variable {i}')
     plt.show()
 
