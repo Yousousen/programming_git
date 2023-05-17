@@ -139,6 +139,7 @@ epsilon_interval = (0.1, 2.02) # Sampling interval for specific internal energy 
 SMALL_CONSTANT = 1e-8 # Small constant to avoid possible division by zero in the calculation of W.
 FILTER_INFS = True # Whether to filter out infinities in the input data.
 FILTER_INVALID_VALS = True # Whether to filter out infinities in the input data.
+NAN_TO_NUM = True # Whether to replace NaNs with zeros in the input data.
 
 np.random.seed(41) # Uncomment for pseudorandom data.
 
@@ -327,6 +328,7 @@ epsilon_test
 # In[ ]:
 
 
+# TODO: Remove this if it is not needed. I mean I do it in the sample_primitive_variables function already, but I believe I stil got nan-values in test then, while now with this cell I do not any longer.
 if FILTER_INVALID_VALS:
     # Sampling the primitive variables using the sample_primitive_variables function
     rho_train, vx_train, vy_train, vz_train ,epsilon_train = sample_primitive_variables(n_train_samples)
@@ -463,13 +465,28 @@ plt.show()
 # In[ ]:
 
 
+# print('Summary statistics of input variables before z-score normalization')
+# print(torch.stack([torch.min(x_train, dim=0).values,
+#                 torch.max(x_train, dim=0).values,
+#                 torch.mean(x_train, dim=0),
+#                 torch.median(x_train, dim=0).values,
+#                 torch.std(x_train, dim=0)], dim=1))
+
 # Computing summary statistics of the input variables before and after z-score normalization
 print('Summary statistics of input variables before z-score normalization')
-print(torch.stack([torch.min(x_train, dim=0).values,
-                   torch.max(x_train, dim=0).values,
-                   torch.nanmean(x_train, dim=0), # Modified by Bing
-                   torch.median(x_train, dim=0).values,
-                   torch.nanstd(x_train, dim=0)], dim=1)) # Modified by Bing
+print(torch.stack([torch.min(x_train, dim=0).values, torch.max(x_train, dim=0).values, torch.nanmean(x_train, dim=0), torch.median(x_train, dim=0).values, torch.std(x_train, dim=0)], dim=1))
+
+
+# In[ ]:
+
+
+if NAN_TO_NUM:
+    # Replacing NaNs with zeros using torch.nan_to_num
+    x_train = torch.nan_to_num(x_train)
+    x_test = torch.nan_to_num(x_test) # replace NaNs with zeros
+
+    print('Summary statistics of input variables before z-score normalization')
+    print(torch.stack([torch.min(x_train, dim=0).values, torch.max(x_train, dim=0).values, torch.nanmean(x_train, dim=0), torch.median(x_train, dim=0).values, torch.std(x_train, dim=0)], dim=1))
 
 
 # Perform z-score normalization
@@ -485,33 +502,43 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 if ZSCORE_NORMALIZATION:
     
-    # Computing the median of each input variable from the training set using torch.nanmedian function
-    D_median = torch.nanmedian(x_train[:, 0])
-    Sx_median = torch.nanmedian(x_train[:, 1])
-    Sy_median = torch.nanmedian(x_train[:, 2])
-    Sz_median = torch.nanmedian(x_train[:, 3])
-    tau_median = torch.nanmedian(x_train[:, 4])
+    # # Computing the median of each input variable from the training set using torch.nanmedian function
+    # D_median = torch.nanmedian(x_train[:, 0])
+    # Sx_median = torch.nanmedian(x_train[:, 1])
+    # Sy_median = torch.nanmedian(x_train[:, 2])
+    # Sz_median = torch.nanmedian(x_train[:, 3])
+    # tau_median = torch.nanmedian(x_train[:, 4])
 
-    # Computing the standard deviation of each input variable from the training set using torch.std function with a boolean mask to ignore nan values
-    D_std = torch.std(x_train[~torch.isnan(x_train[:, 0]), 0])
-    Sx_std = torch.std(x_train[~torch.isnan(x_train[:, 1]), 1])
-    Sy_std = torch.std(x_train[~torch.isnan(x_train[:, 2]), 2])
-    Sz_std = torch.std(x_train[~torch.isnan(x_train[:, 3]), 3])
-    tau_std = torch.std(x_train[~torch.isnan(x_train[:, 4]), 4])
+    # # Computing the standard deviation of each input variable from the training set using torch.std function with a boolean mask to ignore nan values
+    # D_std = torch.std(x_train[~torch.isnan(x_train[:, 0]), 0])
+    # Sx_std = torch.std(x_train[~torch.isnan(x_train[:, 1]), 1])
+    # Sy_std = torch.std(x_train[~torch.isnan(x_train[:, 2]), 2])
+    # Sz_std = torch.std(x_train[~torch.isnan(x_train[:, 3]), 3])
+    # tau_std = torch.std(x_train[~torch.isnan(x_train[:, 4]), 4])
 
 
-    # Applying z-score normalization to both train and test sets using the statistics from the training set
-    x_train[:, 0] = torch.sub(x_train[:, 0], D_median).div(D_std)
-    x_train[:, 1] = torch.sub(x_train[:, 1], Sx_median).div(Sx_std)
-    x_train[:, 2] = torch.sub(x_train[:, 2], Sy_median).div(Sy_std)
-    x_train[:, 3] = torch.sub(x_train[:, 3], Sz_median).div(Sz_std)
-    x_train[:, 4] = torch.sub(x_train[:, 4], tau_median).div(tau_std)
+    # # Applying z-score normalization to both train and test sets using the statistics from the training set
+    # x_train[:, 0] = torch.sub(x_train[:, 0], D_median).div(D_std)
+    # x_train[:, 1] = torch.sub(x_train[:, 1], Sx_median).div(Sx_std)
+    # x_train[:, 2] = torch.sub(x_train[:, 2], Sy_median).div(Sy_std)
+    # x_train[:, 3] = torch.sub(x_train[:, 3], Sz_median).div(Sz_std)
+    # x_train[:, 4] = torch.sub(x_train[:, 4], tau_median).div(tau_std)
 
-    x_test[:, 0] = torch.sub(x_test[:, 0], D_median).div(D_std)
-    x_test[:, 1] = torch.sub(x_test[:, 1], Sx_median).div(Sx_std)
-    x_test[:, 2] = torch.sub(x_test[:, 2], Sy_median).div(Sy_std)
-    x_test[:, 3] = torch.sub(x_test[:, 3], Sz_median).div(Sz_std)
-    x_test[:, 4] = torch.sub(x_test[:, 4], tau_median).div(tau_std)
+    # x_test[:, 0] = torch.sub(x_test[:, 0], D_median).div(D_std)
+    # x_test[:, 1] = torch.sub(x_test[:, 1], Sx_median).div(Sx_std)
+    # x_test[:, 2] = torch.sub(x_test[:, 2], Sy_median).div(Sy_std)
+    # x_test[:, 3] = torch.sub(x_test[:, 3], Sz_median).div(Sz_std)
+    # x_test[:, 4] = torch.sub(x_test[:, 4], tau_median).div(tau_std)
+
+    # Computing the mean and standard deviation of each column
+    mean = x_train.mean(dim=0)
+    std = x_train.std(dim=0)
+
+    # Applying z-score normalization
+    x_train = (x_train - mean) / std
+    # Use the same mean and std from the training data as we don't want test data leakage.
+    x_test = (x_test - mean) / std
+
 
 
 # In[ ]:
@@ -540,25 +567,30 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 # In[ ]:
 
 
-# Plotting histograms of the input variables after z-score normalization
-plt.figure(figsize=(10, 10))
-plt.suptitle('Histograms of input variables after z-score normalization')
-for i in range(5):
-    plt.subplot(3, 2, i+1)
-    plt.hist(x_train[:, i], bins=50)
-    plt.xlabel(f'Variable {i}')
-plt.show()
+if ZSCORE_NORMALIZATION: 
+    # Plotting histograms of the input variables after z-score normalization
+    plt.figure(figsize=(10, 10))
+    plt.suptitle('Histograms of input variables after z-score normalization')
+    for i in range(5):
+        plt.subplot(3, 2, i+1)
+        plt.hist(x_train[:, i], bins=50)
+        plt.xlabel(f'Variable {i}')
+    plt.show()
 
 
 # In[ ]:
 
 
-print('Summary statistics of input variables after z-score normalization')
-print(torch.stack([torch.min(x_train, dim=0).values,
-                   torch.max(x_train, dim=0).values,
-                   torch.mean(x_train, dim=0),
-                   torch.median(x_train, dim=0).values,
-                   torch.std(x_train, dim=0)], dim=1))
+if ZSCORE_NORMALIZATION:
+    # print('Summary statistics of input variables after z-score normalization')
+    # print(torch.stack([torch.min(x_train, dim=0).values,
+    #                 torch.max(x_train, dim=0).values,
+    #                 torch.mean(x_train, dim=0),
+    #                 torch.median(x_train, dim=0).values,
+    #                 torch.std(x_train, dim=0)], dim=1))
+    # Computing summary statistics of the input variables after z-score normalization
+    print('Summary statistics of input variables after z-score normalization')
+    print(torch.stack([torch.min(x_train, dim=0).values, torch.max(x_train, dim=0).values, torch.mean(x_train, dim=0), torch.median(x_train, dim=0).values, torch.std(x_train, dim=0)], dim=1))
 
 
 # Checking if our output is always positive by plotting a histogram of y_train and y_test tensors 
