@@ -39,7 +39,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[3]:
+# In[2]:
 
 
 import os
@@ -62,13 +62,13 @@ def save_file(file_name):
     pass
 
 
-# In[4]:
+# In[3]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
 
 
-# In[5]:
+# In[4]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX\n')
@@ -76,7 +76,7 @@ get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna t
 
 # Importing the **libraries** and setting the **device**,
 
-# In[6]:
+# In[5]:
 
 
 import numpy as np
@@ -97,7 +97,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # 
 # **NOTE**: Some **subparameters** still need to be adjusted in the `create_model` function itself as of (Tue May 16 07:42:45 AM CEST 2023).
 
-# In[7]:
+# In[6]:
 
 
 N_TRIALS = 250 # Number of trials for hyperparameter optimization
@@ -127,39 +127,22 @@ BATCH_SIZE_NO_OPT = 49
 N_EPOCHS_NO_OPT = 400
 SCHEDULER_NAME_NO_OPT = "ReduceLROnPlateau"
 
-#Best trial:
-#  Value:  0.00270861783316941
-#  Params: 
-#    n_layers: 3
-#    n_units_0: 555
-#    n_units_1: 458
-#    n_units_2: 115
-#    hidden_activation: ReLU
-#    output_activation: ReLU
-#    loss: Huber
-#    optimizer: RMSprop
-#    lr: 0.000122770896701404
-#    batch_size: 49
-#    n_epochs: 152
-#    scheduler: ReduceLROnPlateau
-#    factor: 0.18979341786654758
-#    patience: 11
-#    threshold: 0.0017197466122611932
-
 c = 1  # Speed of light (used in compute_conserved_variables and sample_primitive_variables functions)
 gamma = 5 / 3  # Adiabatic index (used in eos_analytic function)
 n_train_samples = 80000 # Number of training samples (used in generate_input_data and generate_labels functions)
 n_test_samples = 10000 # Number of test samples (used in generate_input_data and generate_labels functions)
 rho_interval = (0, 10.1) # Sampling interval for rest-mass density (used in sample_primitive_variables function)
 vx_interval = (0, 0.721 * c) # Sampling interval for velocity in x-direction (used in sample_primitive_variables function)
+vy_interval = (0, 0.721 * c) # Sampling interval for velocity in y-direction (used in sample_primitive_variables function)
+vz_interval = (0, 0.721 * c) # Sampling interval for velocity in z-direction (used in sample_primitive_variables function)
 epsilon_interval = (0, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
 
-np.random.seed(40) # Uncomment for pseudorandom data.
+np.random.seed(41) # Uncomment for pseudorandom data.
 
 
 # ## Generating the data
 
-# In[8]:
+# In[7]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -191,32 +174,40 @@ def sample_primitive_variables(n_samples):
         n_samples (int): The number of samples to generate.
 
     Returns:
-        tuple: A tuple of (rho, vx, epsilon), where rho is rest-mass density,
+        tuple: A tuple of (rho, vx, vy, vz, epsilon), where rho is rest-mass density,
             vx is velocity in x-direction,
+            vy is velocity in y-direction,
+            vz is velocity in z-direction,
             epsilon is specific internal energy,
             each being a numpy array of shape (n_samples,).
     """
     # Sampling from uniform distributions with intervals matching Dieseldorst et al.
     rho = np.random.uniform(*rho_interval, size=n_samples)  # Rest-mass density
     vx = np.random.uniform(*vx_interval, size=n_samples)  # Velocity in x-direction
+    vy = np.random.uniform(*vy_interval, size=n_samples)  # Velocity in y-direction
+    vz = np.random.uniform(*vz_interval, size=n_samples)  # Velocity in z-direction 
     epsilon = np.random.uniform(*epsilon_interval, size=n_samples)  # Specific internal energy
 
     # Returning the primitive variables
-    return rho, vx, epsilon
+    return rho, vx, vy, vz, epsilon
 
 
 # Defining a function that computes conserved variables from primitive variables
-def compute_conserved_variables(rho, vx, epsilon):
+def compute_conserved_variables(rho, vx, vy, vz, epsilon):
     """Computes conserved variables from primitive variables.
 
     Args:
         rho (torch.Tensor): The rest-mass density tensor of shape (n_samples,).
-        vx (torch.Tensor): The velocity in x-direction tensor of shape (n_samples,).
+        vx (torch.Tensor): The velocity in x-direction tensor of shape (n_samples,)
+        vy (torch.Tensor): The velocity in y-direction tensor of shape (n_samples,)
+        vz (torch.Tensor): The velocity in z-direction tensor of shape (n_samples,)
         epsilon (torch.Tensor): The specific internal energy tensor of shape (n_samples,).
 
     Returns:
-        tuple: A tuple of (D, Sx, tau), where D is conserved density,
+        tuple: A tuple of (D, Sx, Sy, Sz, tau), where D is conserved density,
             Sx is conserved momentum in x-direction,
+            Sy is conserved momentum in y-direction,
+            Sz is conserved momentum in z-direction,
             tau is conserved energy density,
             each being a torch tensor of shape (n_samples,).
     """
@@ -224,30 +215,35 @@ def compute_conserved_variables(rho, vx, epsilon):
     # Computing the pressure from the primitive variables using the EOS
     p = eos_analytic(rho, epsilon)
     # Computing the Lorentz factor from the velocity.
-    W = 1 / torch.sqrt(1 - vx ** 2 / c ** 2)
+    v2 = vx ** 2 + vy ** 2 + vz ** 2
+    W = 1 / torch.sqrt(1 - v2 / c ** 2)
     # Specific enthalpy
     h = 1 + epsilon + p / rho  
 
     # Computing the conserved variables from the primitive variables
     D = rho * W  # Conserved density
     Sx = rho * h * W ** 2 * vx  # Conserved momentum in x-direction
+    Sy = rho * h * W ** 2 * vy  # Conserved momentum in y-direction
+    Sz = rho * h * W ** 2 * vz  # Conserved momentum in z-direction
     tau = rho * h * W ** 2 - p - D  # Conserved energy density
 
     # Returning the conserved variables
-    return D, Sx, tau
+    return D, Sx, Sy, Sz, tau
 
 # Defining a function that generates input data (conserved variables) from given samples of primitive variables
-def generate_input_data(rho, vx, epsilon):
+def generate_input_data(rho, vx, vy, vz, epsilon):
     # Converting the numpy arrays to torch tensors and moving them to the device
     rho = torch.tensor(rho, dtype=torch.float32).to(device)
     vx = torch.tensor(vx, dtype=torch.float32).to(device)
+    vy = torch.tensor(vy, dtype=torch.float32).to(device)
+    vz = torch.tensor(vz, dtype=torch.float32).to(device)
     epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
 
     # Computing the conserved variables using the compute_conserved_variables function
-    D, Sx, tau = compute_conserved_variables(rho, vx, epsilon)
+    D, Sx, Sy, Sz, tau = compute_conserved_variables(rho, vx, vy, vz, epsilon) 
 
     # Stacking the conserved variables into a torch tensor
-    x = torch.stack([D, Sx, tau], axis=1)
+    x = torch.stack([D, Sx, Sy, Sz, tau], axis=1)
 
     # Returning the input data tensor
     return x
@@ -267,35 +263,45 @@ def generate_labels(rho, epsilon):
 
 # Sampling the primitive variables using the sample_primitive_variables function
 
-# In[50]:
+# In[8]:
 
 
-rho_train, vx_train, epsilon_train = sample_primitive_variables(n_train_samples)
-rho_test, vx_test, epsilon_test = sample_primitive_variables(n_test_samples)
+rho_train, vx_train, vy_train, vz_train ,epsilon_train = sample_primitive_variables(n_train_samples)
+rho_test, vx_test ,vy_test ,vz_test ,epsilon_test = sample_primitive_variables(n_test_samples)
 
 
-# In[51]:
+# In[9]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[52]:
+# In[10]:
 
 
 # Plotting the histograms of rho, vx and epsilon
-plt.figure(figsize=(12, 4))
-plt.subplot(1, 3, 1)
+plt.figure(figsize=(16, 4))
+plt.subplot(1, 5, 1)
 plt.hist(rho_train, bins=20)
 plt.xlabel("rho")
 plt.ylabel("Frequency")
 #plt.yscale("log")
-plt.subplot(1, 3, 2)
+plt.subplot(1, 5, 2)
 plt.hist(vx_train, bins=20)
 plt.xlabel("vx")
 plt.ylabel("Frequency")
 #plt.yscale("log")
-plt.subplot(1, 3, 3)
+plt.subplot(1, 5, 3)
+plt.hist(vy_train, bins=20)
+plt.xlabel("vy")
+plt.ylabel("Frequency")
+#plt.yscale("log")
+plt.subplot(1, 5, 4)
+plt.hist(vz_train, bins=20)
+plt.xlabel("vz")
+plt.ylabel("Frequency")
+#plt.yscale("log")
+plt.subplot(1, 5, 5)
 plt.hist(epsilon_train, bins=20)
 plt.xlabel("epsilon")
 plt.ylabel("Frequency")
@@ -306,33 +312,44 @@ plt.show()
 
 
 
-# In[53]:
+# In[11]:
 
 
 # Generating the input and output data for train and test sets.
-x_train = generate_input_data(rho_train, vx_train, epsilon_train)
+x_train = generate_input_data(rho_train ,vx_train ,vy_train, vz_train, epsilon_train)
 y_train = generate_labels(rho_train, epsilon_train) 
-x_test = generate_input_data(rho_test, vx_test, epsilon_test) 
+x_test = generate_input_data(rho_test, vx_test, vy_test, vz_test, epsilon_test)
 y_test = generate_labels(rho_test, epsilon_test) 
 
 
-# In[54]:
-
-
 # Plotting the histograms of the input data before normalization
-plt.figure(figsize=(12, 4))
-plt.subplot(1, 3, 1)
+
+# In[12]:
+
+
+plt.figure(figsize=(16, 4))
+plt.subplot(1, 5, 1)
 plt.hist(x_train[:, 0].cpu().numpy(), bins=20)
 plt.xlabel("D")
 plt.ylabel("Frequency")
 plt.yscale("log")
-plt.subplot(1, 3, 2)
+plt.subplot(1, 5, 2)
 plt.hist(x_train[:, 1].cpu().numpy(), bins=20)
 plt.xlabel("Sx")
 plt.ylabel("Frequency")
 plt.yscale("log")
-plt.subplot(1, 3, 3)
+plt.subplot(1, 5, 3)
 plt.hist(x_train[:, 2].cpu().numpy(), bins=20)
+plt.xlabel("Sy")
+plt.ylabel("Frequency")
+plt.yscale("log")
+plt.subplot(1, 5, 4)
+plt.hist(x_train[:, 3].cpu().numpy(), bins=20)
+plt.xlabel("Sz")
+plt.ylabel("Frequency")
+plt.yscale("log")
+plt.subplot(1, 5, 5)
+plt.hist(x_train[:, 4].cpu().numpy(), bins=20)
 plt.xlabel("tau")
 plt.ylabel("Frequency")
 plt.yscale("log")
@@ -343,7 +360,7 @@ plt.show()
 
 # Perform z-score normalization
 
-# In[55]:
+# In[34]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -352,43 +369,73 @@ if ZSCORE_NORMALIZATION:
     D_std = torch.std(x_train[:, 0])
     Sx_mean = torch.mean(x_train[:, 1])
     Sx_std = torch.std(x_train[:, 1])
-    tau_mean = torch.mean(x_train[:, 2])
-    tau_std = torch.std(x_train[:, 2])
+    Sy_mean = torch.mean(x_train[:, 2])
+    Sy_std = torch.std(x_train[:, 2])
+    Sz_mean = torch.mean(x_train[:, 3])
+    Sz_std = torch.std(x_train[:, 3])
+    tau_mean = torch.mean(x_train[:, 4])
+    tau_std = torch.std(x_train[:, 4])
 
     # Applying z-score normalization to both train and test sets using the statistics from the training set
     x_train[:, 0] = torch.sub(x_train[:, 0], D_mean).div(D_std)
     x_train[:, 1] = torch.sub(x_train[:, 1], Sx_mean).div(Sx_std)
-    x_train[:, 2] = torch.sub(x_train[:, 2], tau_mean).div(tau_std)
+    x_train[:, 2] = torch.sub(x_train[:, 2], Sy_mean).div(Sy_std)
+    x_train[:, 3] = torch.sub(x_train[:, 3], Sz_mean).div(Sz_std)
+    x_train[:, 4] = torch.sub(x_train[:, 4], tau_mean).div(tau_std)
+
     x_test[:, 0] = torch.sub(x_test[:, 0], D_mean).div(D_std)
     x_test[:, 1] = torch.sub(x_test[:, 1], Sx_mean).div(Sx_std)
-    x_test[:, 2] = torch.sub(x_test[:, 2], tau_mean).div(tau_std)
-
-
-# In[56]:
+    x_test[:, 2] = torch.sub(x_test[:, 2], Sy_mean).div(Sy_std)
+    x_test[:, 3] = torch.sub(x_test[:, 3], Sz_mean).div(Sz_std)
+    x_test[:, 4] = torch.sub(x_test[:, 4], tau_mean).div(tau_std)
 
 
 # Verifying that the means and the stds of the input data are close to 0 and 1 respectively.
-print(torch.mean(x_train[:, 0]))
-print(torch.std(x_train[:, 0]))
-print(torch.mean(x_train[:, 1]))
-print(torch.std(x_train[:, 1]))
-print(torch.mean(x_train[:, 2]))
-print(torch.std(x_train[:, 2]))
 
-# Plotting the histograms of the input data after normalization
-plt.figure(figsize=(12, 4))
-plt.subplot(1, 3, 1)
+# In[13]:
+
+
+if ZSCORE_NORMALIZATION:
+    print(torch.mean(x_train[:, 0]))
+    print(torch.std(x_train[:, 0]))
+    print(torch.mean(x_train[:, 1]))
+    print(torch.std(x_train[:, 1]))
+    print(torch.mean(x_train[:, 2]))
+    print(torch.std(x_train[:, 2]))
+    print(torch.mean(x_train[:, 3]))
+    print(torch.std(x_train[:, 3]))
+    print(torch.mean(x_train[:, 4]))
+    print(torch.std(x_train[:, 4]))
+
+
+# Plotting the histograms of the input data after normalization if z-score normalization was performed.
+
+# In[14]:
+
+
+plt.figure(figsize=(16, 4))
+plt.subplot(1, 5, 1)
 plt.hist(x_train[:, 0].cpu().numpy(), bins=20)
 plt.xlabel("D")
 plt.ylabel("Frequency")
 plt.yscale("log")
-plt.subplot(1, 3, 2)
+plt.subplot(1, 5, 2)
 plt.hist(x_train[:, 1].cpu().numpy(), bins=20)
 plt.xlabel("Sx")
 plt.ylabel("Frequency")
 plt.yscale("log")
-plt.subplot(1, 3, 3)
+plt.subplot(1, 5, 3)
 plt.hist(x_train[:, 2].cpu().numpy(), bins=20)
+plt.xlabel("Sy")
+plt.ylabel("Frequency")
+plt.yscale("log")
+plt.subplot(1, 5, 4)
+plt.hist(x_train[:, 3].cpu().numpy(), bins=20)
+plt.xlabel("Sz")
+plt.ylabel("Frequency")
+plt.yscale("log")
+plt.subplot(1, 5, 5)
+plt.hist(x_train[:, 4].cpu().numpy(), bins=20)
 plt.xlabel("tau")
 plt.ylabel("Frequency")
 plt.yscale("log")
@@ -397,10 +444,11 @@ plt.tight_layout()
 plt.show()
 
 
-# In[57]:
-
-
 # Checking if our output is always positive by plotting a histogram of y_train and y_test tensors 
+
+# In[15]:
+
+
 plt.figure(figsize=(8, 4))
 plt.subplot(1, 2, 1)
 plt.hist(y_train.cpu().numpy(), bins=20) # must be cpu here.
@@ -416,7 +464,7 @@ plt.tight_layout()
 plt.show()
 
 
-# In[58]:
+# In[16]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -456,7 +504,7 @@ class Net(nn.Module):
         self.output_activation = output_activation
 
         # Creating a list of linear layers with different numbers of units for each layer
-        self.layers = nn.ModuleList([nn.Linear(3, n_units[0])])
+        self.layers = nn.ModuleList([nn.Linear(5, n_units[0])])
         for i in range(1, n_layers):
             self.layers.append(nn.Linear(n_units[i - 1], n_units[i]))
         self.layers.append(nn.Linear(n_units[-1], 1))
@@ -472,11 +520,15 @@ class Net(nn.Module):
         """Performs a forward pass on the input tensor.
 
         Args:
-            x (torch.Tensor): The input tensor of shape (batch_size, 3).
+            x (torch.Tensor): The input tensor of shape (batch_size, 5).
 
         Returns:
             torch.Tensor: The output tensor of shape (batch_size, 1).
         """
+        # Adding an assertion to check that the input tensor has the expected shape and type
+        assert isinstance(x, torch.Tensor), "x must be a torch.Tensor"
+        assert x.shape[1] == 5, "x must have shape (batch_size, 5)"
+
         # Looping over the hidden layers and applying the linear transformation and the activation function
         for layer in self.layers[:-1]:
             x = self.hidden_activation(layer(x))
@@ -688,25 +740,6 @@ def create_model(trial, optimize):
                     )
         else:
             scheduler = None
-#Best trial:
-#  Value:  0.00270861783316941
-#  Params: 
-#    n_layers: 3
-#    n_units_0: 555
-#    n_units_1: 458
-#    n_units_2: 115
-#    hidden_activation: ReLU
-#    output_activation: ReLU
-#    loss: Huber
-#    optimizer: RMSprop
-#    lr: 0.000122770896701404
-#    batch_size: 49
-#    n_epochs: 152
-#    scheduler: ReduceLROnPlateau
-#    factor: 0.18979341786654758
-#    patience: 11
-#    threshold: 0.0017197466122611932
-
 
     # Returning all variables needed for saving and loading
     return net, loss_fn, optimizer, batch_size, n_epochs, scheduler, loss_name, optimizer_name, scheduler_name, n_units, n_layers, hidden_activation, output_activation, lr
@@ -1072,6 +1105,7 @@ train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
 
 
 import json
+import pandas as pd
 
 # save the network to a .pth file
 torch.save(net.state_dict(), "net.pth")
