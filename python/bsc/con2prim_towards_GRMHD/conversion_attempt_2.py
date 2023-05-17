@@ -48,7 +48,7 @@ import shutil
 # check if the drive is mounted
 drive_mounted = os.path.exists("/content/drive")
 # change this to your desired folder
-drive_folder = "/content/drive/My Drive/bsc/con2prim_restoration/"
+drive_folder = "/content/drive/My Drive/bsc/con2prim_towards_GRMHD/"
 
 # define a function to save a file to the drive or the current directory
 def save_file(file_name):
@@ -1468,10 +1468,10 @@ get_ipython().run_cell_magic('script', 'echo skipping', '\n# Set the network to 
 # In[32]:
 
 
-rho_example, vx_example, epsilon_example = sample_primitive_variables(20)
+rho_example, vx_example, vy_example, vz_example, epsilon_example = sample_primitive_variables(20)
 
 # Create arbitrary input
-inputs =  generate_input_data(rho_example, vx_example, epsilon_example)
+inputs =  generate_input_data(rho_example, vx_example, vy_example, vz_example, epsilon_example)
 inputs
 
 
@@ -1504,8 +1504,8 @@ outputs
 
 import torch.jit
 
-# Creating a dummy input tensor of shape (1, 3) to trace the model
-dummy_input = torch.randn(1, 3).to(device)
+# Creating a dummy input tensor of shape (1, 5) to trace the model
+dummy_input = torch.randn(1, 5).to(device)
 dummy_input
 
 # Ensure that net_loaded is in evaluation mode.
@@ -1521,10 +1521,4 @@ save_file("net.pt")
 example_input_to_validate_correct_export_and_import = generate_input_data(*sample_primitive_variables(1))
 example_input_to_validate_correct_export_and_import
 net_loaded(example_input_to_validate_correct_export_and_import)
-
-
-# In[ ]:
-
-
-
 
