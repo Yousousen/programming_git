@@ -131,15 +131,15 @@ c = 1  # Speed of light (used in compute_conserved_variables and sample_primitiv
 gamma = 5 / 3  # Adiabatic index (used in eos_analytic function)
 n_train_samples = 80000 # Number of training samples (used in generate_input_data and generate_labels functions)
 n_test_samples = 10000 # Number of test samples (used in generate_input_data and generate_labels functions)
-rho_interval = (0.1, 10.1) # Sampling interval for rest-mass density (used in sample_primitive_variables function)
-vx_interval = (0.1, 0.721 * c) # Sampling interval for velocity in x-direction (used in sample_primitive_variables function)
-vy_interval = (0.1, 0.721 * c) # Sampling interval for velocity in y-direction (used in sample_primitive_variables function)
-vz_interval = (0.1, 0.721 * c) # Sampling interval for velocity in z-direction (used in sample_primitive_variables function)
-epsilon_interval = (0.1, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
+rho_interval = (0, 10.1) # Sampling interval for rest-mass density (used in sample_primitive_variables function)
+vx_interval = (0, .57 * c) # Sampling interval for velocity in x-direction (used in sample_primitive_variables function)
+vy_interval = (0, .57 * c) # Sampling interval for velocity in y-direction (used in sample_primitive_variables function)
+vz_interval = (0, .57 * c) # Sampling interval for velocity in z-direction (used in sample_primitive_variables function)
+epsilon_interval = (0, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
 SMALL_CONSTANT = 1e-8 # Small constant to avoid possible division by zero in the calculation of W.
-FILTER_INFS = True # Whether to filter out infinities in the input data.
-FILTER_INVALID_VALS = True # Whether to filter out infinities in the input data.
-NAN_TO_NUM = True # Whether to replace NaNs with zeros in the input data.
+FILTER_INFS = False # Whether to filter out infinities in the input data.
+FILTER_INVALID_VALS = False # Whether to filter out infinities in the input data.
+NAN_TO_NUM = False # Whether to replace NaNs with zeros in the input data.
 
 np.random.seed(41) # Uncomment for pseudorandom data.
 
@@ -236,7 +236,7 @@ def compute_conserved_variables(rho, vx, vy, vz, epsilon):
     p = eos_analytic(rho, epsilon)
     # Computing the Lorentz factor from the velocity.
     v2 = vx ** 2 + vy ** 2 + vz ** 2
-    W = 1 / torch.sqrt(1 - v2 / c ** 2 + SMALL_CONSTANT)
+    W = 1 / torch.sqrt(1 - v2 / c ** 2)
     # Specific enthalpy
     h = 1 + epsilon + p / rho  
 
@@ -481,6 +481,16 @@ print(torch.stack([torch.min(x_train, dim=0).values, torch.max(x_train, dim=0).v
 
 
 if NAN_TO_NUM:
+    # Plotting histograms of the input variables before z-score normalization
+    plt.figure(figsize=(10, 10))
+    plt.suptitle('Histograms of input variables before z-score normalization')
+    for i in range(5):
+        plt.subplot(3, 2, i+1)
+        plt.hist(x_train[:, i], bins=50)
+        plt.xlabel(f'Variable {i}')
+    plt.show()
+
+
     # Replacing NaNs with zeros using torch.nan_to_num
     x_train = torch.nan_to_num(x_train)
     x_test = torch.nan_to_num(x_test) # replace NaNs with zeros
