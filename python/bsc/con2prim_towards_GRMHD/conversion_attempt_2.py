@@ -51,7 +51,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[113]:
+# In[ ]:
 
 
 import os
@@ -661,15 +661,17 @@ def create_model(trial, optimize):
     # If optimize is True, sample the hyperparameters from the search space
     if optimize:
         # Sampling the hyperparameters from the search space
-        n_layers = trial.suggest_int("n_layers", 1, 5)
+        n_layers = trial.suggest_int("n_layers", 2, 4)
         n_units = [trial.suggest_int(f"n_units_{i}", 16, 1048) for i in range(n_layers)] 
         hidden_activation_name = trial.suggest_categorical(
-            "hidden_activation", ["ReLU", "LeakyReLU", "ELU", "Tanh", "Sigmoid"]
+            #"hidden_activation", ["ReLU", "LeakyReLU", "ELU", "Tanh", "Sigmoid"]
+            "hidden_activation", ["ReLU", "LeakyReLU"]
         )
         output_activation_name = trial.suggest_categorical(
             #"output_activation", ["Linear", "ReLU", "Softplus"]
             # Assuming pressure cannot be negative, linear output activation is not an option.
-            "output_activation", ["ReLU", "Softplus"]
+            #"output_activation", ["ReLU", "Softplus", "Linear"]
+            "output_activation", ["ReLU", "Linear"]
         ) 
         loss_name = trial.suggest_categorical(
             #"loss", ["MSE", "MAE", "Huber", "LogCosh"] 
@@ -679,8 +681,8 @@ def create_model(trial, optimize):
             "optimizer", ["Adam", "SGD", "RMSprop", "Adagrad"] 
         )
         lr = trial.suggest_loguniform("lr", 1e-4, 1e-2) 
-        batch_size = trial.suggest_int("batch_size", 16, 512)
-        n_epochs = trial.suggest_int("n_epochs", 50, 200) 
+        batch_size = trial.suggest_int("batch_size", 16, 1048)
+        n_epochs = trial.suggest_int("n_epochs", 50, 150) 
         scheduler_name = trial.suggest_categorical(
             "scheduler",
             ["None", "CosineAnnealingLR", "ReduceLROnPlateau", "StepLR", "ExponentialLR"],
@@ -1294,7 +1296,7 @@ plt.show()
 
 # ## Loading
 
-# In[152]:
+# In[1]:
 
 
 import json
@@ -1446,7 +1448,7 @@ test_metrics_loaded = [
 ]
 
 
-# In[153]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\nbatch_size_loaded\nn_epochs_loaded\nloss_name_loaded\noptimizer_name_loaded\nscheduler_name_loaded\nn_units_loaded\nn_layers_loaded\nhidden_activation_name_loaded\noutput_activation_name_loaded\nlr_loaded\nhidden_activation_loaded\noutput_activation_loaded\nnet_loaded\nnet_loaded.__dict__ # print the subparameters of the network\nloss_fn_loaded\noptimizer_loaded\noptimizer_loaded.__dict__ # print the subparameters of the optimizer\nscheduler_loaded\nscheduler_loaded.__dict__ # print the subparameters of the scheduler\ntrain_losses_loaded\ntest_losses_loaded\ntrain_metrics_loaded\ntest_metrics_loaded\n')
@@ -1526,6 +1528,21 @@ plt.show()
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
+
+
+# ## Counting the number of parameters in the network.
+
+# In[ ]:
+
+
+net_loaded.eval()
+
+total_params = 0
+for layer in net_loaded.parameters():
+    layer_params = layer.numel()
+    total_params += layer_params
+
+print(f"The model has {total_params:,} trainable parameters.")
 
 
 # ## Evaluating the network on arbirary input
