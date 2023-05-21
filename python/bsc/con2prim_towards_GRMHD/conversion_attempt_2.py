@@ -4,33 +4,45 @@
 # # Neural network to learn conservative-to-primitive conversion in relativistic hydrodynamics
 
 # ## How to use this notebook
-# 0. Install required packages with `pip install -r requirements.txt`
+# 
+# ### Local installation
+# 
+# 1. Install required packages with `pip install -r requirements.txt` to your desired environment.
+# 2. If a script version of this notebook is desired, comment (not uncomment) the first line of `nbconvert` cell.
+# 
+# ### Colab installation
+# 
+# 1.  Comment (not uncomment) the first line of the drive mounting cell.
+# 2.  Comment (not uncomment) the first line of the `pip install` cell.
+# 
+# <!-- - For colab we also want to set the runtime to GPU by clicking _Change runtime_ in the _Runtime_ menu, and -->
+# <!-- - We want to wait for the google drive connection popup to appear and follow the instructions. -->
 # 
 # ### Training without optimization
 # 
-# 1. Set `OPTIMIZE = False` in section _Constants and flags to set_.
-# 2. Run the entire notebook.
+# 3. Set `OPTIMIZE = False` in section _Constants and flags to set_.
+# 4. Run the entire notebook.
 # 
 # ### Training with optimization
 # 
-# 1. Set `OPTIMIZE = True` in section _Constants and flags to set_.
-# 2. Run the entire notebook.
+# 3. Set `OPTIMIZE = True` in section _Constants and flags to set_.
+# 4. Run the entire notebook.
 # 
 # ### Loading an already trained model
 # 
-# 1. Run cells in section _Initialization_.
-# 2. Run cells with definitions in section _Generating the data_.
-# 3. Run cell with the definition of _Net_ in section _Defining the neural network_.
-# 4. Make sure the `net.pth`, `optimizer.pth`, `scheduler.pth`, `var_dict.json` and `train_output.csv` files are in the directory containing this notebook.
-# 5. Run the cells in section _Loading_ and continue from there.
+# 3. Run cells in section _Initialization_.
+# 4. Run cells with definitions in section _Generating the data_.
+# 5. Run cell with the definition of _Net_ in section _Defining the neural network_.
+# 6. Make sure the `net.pth`, `optimizer.pth`, `scheduler.pth`, `var_dict.json` and `train_output.csv` files are in the directory containing this notebook.
+# 7. Run the cells in section _Loading_ and continue from there.
 # 
 # ### Generating the C++ model
 # 
-# 1. Run section _Porting the model to C++_, this requires a model to be loaded.
-# 2. Set the path to the `net.pt` file in the C++ source file.
-# 3. `mkdir build && cd build`,
-# 4. `cmake -DCMAKE_PREFIX_PATH=/path/to/libtorch/ ..`,
-# 3. Compile and run, e.g. `cmake --build . --config release && ./executable`
+# 8. Run section _Porting the model to C++_, this requires a model to be loaded.
+# 9. Set the path to the `net.pt` file in the C++ source file.
+# 10. `mkdir build && cd build`,
+# 11. `cmake -DCMAKE_PREFIX_PATH=/path/to/libtorch/ ..`,
+# 10. Compile and run, e.g. `cmake --build . --config release && ./executable`
 
 # ## Initialization
 
@@ -39,7 +51,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[ ]:
+# In[113]:
 
 
 import os
@@ -62,13 +74,13 @@ def save_file(file_name):
     pass
 
 
-# In[ ]:
+# In[114]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
 
 
-# In[ ]:
+# In[115]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX\n')
@@ -76,7 +88,7 @@ get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna t
 
 # Importing the **libraries** and setting the **device**,
 
-# In[ ]:
+# In[116]:
 
 
 import numpy as np
@@ -97,7 +109,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # 
 # **NOTE**: Some **subparameters** still need to be adjusted in the `create_model` function itself as of (Tue May 16 07:42:45 AM CEST 2023).
 
-# In[ ]:
+# In[117]:
 
 
 N_TRIALS = 250 # Number of trials for hyperparameter optimization
@@ -131,22 +143,18 @@ c = 1  # Speed of light (used in compute_conserved_variables and sample_primitiv
 gamma = 5 / 3  # Adiabatic index (used in eos_analytic function)
 n_train_samples = 80000 # Number of training samples (used in generate_input_data and generate_labels functions)
 n_test_samples = 10000 # Number of test samples (used in generate_input_data and generate_labels functions)
-rho_interval = (0.1, 10.1) # Sampling interval for rest-mass density (used in sample_primitive_variables function)
-vx_interval = (0.1, 0.721 * c) # Sampling interval for velocity in x-direction (used in sample_primitive_variables function)
-vy_interval = (0.1, 0.721 * c) # Sampling interval for velocity in y-direction (used in sample_primitive_variables function)
-vz_interval = (0.1, 0.721 * c) # Sampling interval for velocity in z-direction (used in sample_primitive_variables function)
-epsilon_interval = (0.1, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
-SMALL_CONSTANT = 1e-8 # Small constant to avoid possible division by zero in the calculation of W.
-FILTER_INFS = True # Whether to filter out infinities in the input data.
-FILTER_INVALID_VALS = True # Whether to filter out infinities in the input data.
-NAN_TO_NUM = True # Whether to replace NaNs with zeros in the input data.
+rho_interval = (0, 10.1) # Sampling interval for rest-mass density (used in sample_primitive_variables function)
+vx_interval = (0, .57 * c) # Sampling interval for velocity in x-direction (used in sample_primitive_variables function)
+vy_interval = (0, .57 * c) # Sampling interval for velocity in y-direction (used in sample_primitive_variables function)
+vz_interval = (0, .57 * c) # Sampling interval for velocity in z-direction (used in sample_primitive_variables function)
+epsilon_interval = (0, 2.02) # Sampling interval for specific internal energy (used in sample_primitive_variables function)
 
-np.random.seed(41) # Uncomment for pseudorandom data.
+np.random.seed(42) # Uncomment for pseudorandom data.
 
 
 # ## Generating the data
 
-# In[ ]:
+# In[118]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -195,18 +203,6 @@ def sample_primitive_variables(n_samples):
     vz = np.random.uniform(*vz_interval, size=n_samples)  # Velocity in z-direction 
     epsilon = np.random.uniform(*epsilon_interval, size=n_samples)  # Specific internal energy
 
-
-    if FILTER_INVALID_VALS:
-        # Checking for other invalid values in the primitive variables using logical operators
-        valid_mask = (rho > 0) & (vx < c) & (vy < c) & (vz < c) & (epsilon > 0)
-
-        # Filtering out the invalid values using the valid_mask
-        rho = rho[valid_mask]
-        vx = vx[valid_mask]
-        vy = vy[valid_mask]
-        vz = vz[valid_mask]
-        epsilon = epsilon[valid_mask]
-
     # Returning the primitive variables
     return rho, vx, vy, vz, epsilon
 
@@ -236,7 +232,7 @@ def compute_conserved_variables(rho, vx, vy, vz, epsilon):
     p = eos_analytic(rho, epsilon)
     # Computing the Lorentz factor from the velocity.
     v2 = vx ** 2 + vy ** 2 + vz ** 2
-    W = 1 / torch.sqrt(1 - v2 / c ** 2 + SMALL_CONSTANT)
+    W = 1 / torch.sqrt(1 - v2 / c ** 2)
     # Specific enthalpy
     h = 1 + epsilon + p / rho  
 
@@ -259,18 +255,6 @@ def generate_input_data(rho, vx, vy, vz, epsilon):
     vz = torch.tensor(vz, dtype=torch.float32).to(device)
     epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
 
-    if FILTER_INFS:
-        # Checking the validity of the primitive variables using torch.isfinite function
-        valid_mask = torch.isfinite(rho) & torch.isfinite(vx) & torch.isfinite(vy) & torch.isfinite(vz)
-
-        # Filtering out the invalid values using the valid_mask
-        rho = rho[valid_mask]
-        vx = vx[valid_mask]
-        vy = vy[valid_mask]
-        vz = vz[valid_mask]
-        epsilon = epsilon[valid_mask]
-
-
     # Computing the conserved variables using the compute_conserved_variables function
     D, Sx, Sy, Sz, tau = compute_conserved_variables(rho, vx, vy, vz, epsilon) 
 
@@ -285,14 +269,6 @@ def generate_labels(rho, epsilon):
     # Converting the numpy arrays to torch tensors and moving them to the device
     rho = torch.tensor(rho, dtype=torch.float32).to(device)
     epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
-
-    if FILTER_INFS:
-        # Checking the validity of the primitive variables using torch.isfinite function
-        valid_mask = torch.isfinite(rho) & torch.isfinite(epsilon)
-
-        # Filtering out the invalid values using the valid_mask
-        rho = rho[valid_mask]
-        epsilon = epsilon[valid_mask]
    
     # Computing the pressure from the primitive variables using the EOS
     p = eos_analytic(rho, epsilon)
@@ -303,14 +279,14 @@ def generate_labels(rho, epsilon):
 
 # Sampling the primitive variables using the sample_primitive_variables function
 
-# In[ ]:
+# In[119]:
 
 
 rho_train, vx_train, vy_train, vz_train ,epsilon_train = sample_primitive_variables(n_train_samples)
 rho_test, vx_test ,vy_test ,vz_test ,epsilon_test = sample_primitive_variables(n_test_samples)
 
 
-# In[ ]:
+# In[120]:
 
 
 rho_train
@@ -325,64 +301,13 @@ vz_test
 epsilon_test
 
 
-# In[ ]:
-
-
-# TODO: Remove this if it is not needed. I mean I do it in the sample_primitive_variables function already, but I believe I stil got nan-values in test then, while now with this cell I do not any longer.
-if FILTER_INVALID_VALS:
-    # Sampling the primitive variables using the sample_primitive_variables function
-    rho_train, vx_train, vy_train, vz_train ,epsilon_train = sample_primitive_variables(n_train_samples)
-    rho_test, vx_test ,vy_test ,vz_test ,epsilon_test = sample_primitive_variables(n_test_samples)
-
-    # Checking for other invalid values in the train set using logical operators
-    valid_mask_train = (rho_train > 0) & (vx_train < c) & (vy_train < c) & (vz_train < c) & (epsilon_train > 0)
-
-    # Filtering out the invalid values from the train set using the valid_mask
-    rho_train = rho_train[valid_mask_train]
-    vx_train = vx_train[valid_mask_train]
-    vy_train = vy_train[valid_mask_train]
-    vz_train = vz_train[valid_mask_train]
-    epsilon_train = epsilon_train[valid_mask_train]
-
-    # Checking for other invalid values in the test set using logical operators
-    valid_mask_test = (rho_test > 0) & (vx_test < c) & (vy_test < c) & (vz_test < c) & (epsilon_test > 0)
-
-    # Filtering out the invalid values from the test set using the valid_mask
-    rho_test = rho_test[valid_mask_test]
-    vx_test = vx_test[valid_mask_test]
-    vy_test = vy_test[valid_mask_test]
-    vz_test = vz_test[valid_mask_test]
-    epsilon_test = epsilon_test[valid_mask_test]
-
-    # Generating the input and output data for train and test sets.
-    x_train = generate_input_data(rho_train ,vx_train ,vy_train, vz_train, epsilon_train)
-    y_train = generate_labels(rho_train, epsilon_train) 
-    x_test = generate_input_data(rho_test, vx_test, vy_test, vz_test, epsilon_test)
-    y_test = generate_labels(rho_test, epsilon_test) 
-
-
-# In[ ]:
-
-
-rho_train
-vx_train
-vy_train
-vz_train 
-epsilon_train
-rho_test
-vx_test 
-vy_test 
-vz_test 
-epsilon_test
-
-
-# In[ ]:
+# In[123]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[ ]:
+# In[124]:
 
 
 # Plotting the histograms of rho, vx and epsilon
@@ -418,13 +343,13 @@ plt.show()
 
 
 
-# In[ ]:
+# In[125]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
 
 
-# In[ ]:
+# In[126]:
 
 
 # Generating the input and output data for train and test sets.
@@ -434,7 +359,7 @@ x_test = generate_input_data(rho_test, vx_test, vy_test, vz_test, epsilon_test)
 y_test = generate_labels(rho_test, epsilon_test) 
 
 
-# In[ ]:
+# In[127]:
 
 
 x_train
@@ -443,13 +368,13 @@ x_test
 y_test
 
 
-# In[ ]:
+# In[128]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[ ]:
+# In[129]:
 
 
 # Note how we are only plotting train and not test here. 
@@ -463,7 +388,7 @@ for i in range(5):
 plt.show()
 
 
-# In[ ]:
+# In[130]:
 
 
 # print('Summary statistics of input variables before z-score normalization')
@@ -478,10 +403,20 @@ print('Summary statistics of input variables before z-score normalization')
 print(torch.stack([torch.min(x_train, dim=0).values, torch.max(x_train, dim=0).values, torch.nanmean(x_train, dim=0), torch.median(x_train, dim=0).values, torch.std(x_train, dim=0)], dim=1))
 
 
-# In[ ]:
+# In[131]:
 
 
 if NAN_TO_NUM:
+    # Plotting histograms of the input variables before z-score normalization
+    plt.figure(figsize=(10, 10))
+    plt.suptitle('Histograms of input variables before z-score normalization')
+    for i in range(5):
+        plt.subplot(3, 2, i+1)
+        plt.hist(x_train[:, i], bins=50)
+        plt.xlabel(f'Variable {i}')
+    plt.show()
+
+
     # Replacing NaNs with zeros using torch.nan_to_num
     x_train = torch.nan_to_num(x_train)
     x_test = torch.nan_to_num(x_test) # replace NaNs with zeros
@@ -492,13 +427,13 @@ if NAN_TO_NUM:
 
 # Perform z-score normalization
 
-# In[ ]:
+# In[132]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
 
 
-# In[ ]:
+# In[133]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -542,13 +477,13 @@ if ZSCORE_NORMALIZATION:
 
 
 
-# In[ ]:
+# In[134]:
 
 
 torch.__version__
 
 
-# In[ ]:
+# In[135]:
 
 
 x_train[:, 0]
@@ -559,13 +494,13 @@ x_test
 
 # Plotting the histograms of the input data after normalization if z-score normalization was performed.
 
-# In[ ]:
+# In[136]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[ ]:
+# In[137]:
 
 
 if ZSCORE_NORMALIZATION: 
@@ -580,7 +515,7 @@ if ZSCORE_NORMALIZATION:
     plt.show()
 
 
-# In[ ]:
+# In[138]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -597,7 +532,7 @@ if ZSCORE_NORMALIZATION:
 
 # Checking if our output is always positive by plotting a histogram of y_train and y_test tensors 
 
-# In[ ]:
+# In[139]:
 
 
 plt.figure(figsize=(8, 4))
@@ -615,7 +550,7 @@ plt.tight_layout()
 plt.show()
 
 
-# In[ ]:
+# In[140]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -623,7 +558,7 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 # ## Defining the neural network
 
-# In[ ]:
+# In[141]:
 
 
 # Defining a class for the network
@@ -692,7 +627,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[ ]:
+# In[142]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -901,7 +836,7 @@ def create_model(trial, optimize):
 # 
 #  We first define a couple of functions used in the training and evaluation.
 
-# In[ ]:
+# In[143]:
 
 
 # Defining a function that computes loss and metrics for a given batch
@@ -961,7 +896,7 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[ ]:
+# In[144]:
 
 
 # Defining a function to train and evaluate a network
@@ -1129,7 +1064,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
 # ## The objective function and hyperparameter tuning
 
-# In[ ]:
+# In[145]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -1167,7 +1102,7 @@ def objective(trial):
     return test_metrics[-1]["l1_norm"]
 
 
-# In[ ]:
+# In[146]:
 
 
 if OPTIMIZE:
@@ -1188,7 +1123,7 @@ if OPTIMIZE:
 
 # ## Training the model
 
-# In[ ]:
+# In[147]:
 
 
 # Creating the best network and optimizer using the best hyperparameters
@@ -1225,7 +1160,7 @@ else:
     lr = create_model(trial=None, optimize=False)
 
 
-# In[ ]:
+# In[148]:
 
 
 print("loss_fn:", loss_fn)
@@ -1241,7 +1176,7 @@ print("hidden_activation:", hidden_activation)
 print("output_activation:", output_activation)
 
 
-# In[ ]:
+# In[149]:
 
 
 # Training and evaluating the network using the train_and_eval function
@@ -1252,7 +1187,7 @@ train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
 
 # ## Saving
 
-# In[ ]:
+# In[150]:
 
 
 import json
@@ -1307,7 +1242,7 @@ save_file("train_output.csv")
 
 # ## Visualizing the results
 
-# In[ ]:
+# In[151]:
 
 
 # Plotting the losses and metrics for the best network 
@@ -1359,7 +1294,7 @@ plt.show()
 
 # ## Loading
 
-# In[ ]:
+# In[152]:
 
 
 import json
@@ -1511,13 +1446,13 @@ test_metrics_loaded = [
 ]
 
 
-# In[ ]:
+# In[153]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\nbatch_size_loaded\nn_epochs_loaded\nloss_name_loaded\noptimizer_name_loaded\nscheduler_name_loaded\nn_units_loaded\nn_layers_loaded\nhidden_activation_name_loaded\noutput_activation_name_loaded\nlr_loaded\nhidden_activation_loaded\noutput_activation_loaded\nnet_loaded\nnet_loaded.__dict__ # print the subparameters of the network\nloss_fn_loaded\noptimizer_loaded\noptimizer_loaded.__dict__ # print the subparameters of the optimizer\nscheduler_loaded\nscheduler_loaded.__dict__ # print the subparameters of the scheduler\ntrain_losses_loaded\ntest_losses_loaded\ntrain_metrics_loaded\ntest_metrics_loaded\n')
 
 
-# In[ ]:
+# In[154]:
 
 
 train_losses_loaded[-1]
@@ -1532,13 +1467,13 @@ print(f'Error is {test_metrics_loaded[-1]["linf_norm"] / (8.14e-3)} times bigger
 
 # Let us verify correct loading of the train and test metrics by visualizing them again but now through the loaded values. Likewise for the train and test losses.
 
-# In[ ]:
+# In[155]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[ ]:
+# In[156]:
 
 
 # Plotting the losses and metrics for the best network plt.figure(figsize=(12, 
@@ -1587,7 +1522,7 @@ plt.legend()
 plt.show()
 
 
-# In[ ]:
+# In[157]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -1598,25 +1533,25 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 # 
 # We compare `net` and `net_loaded` to confirm correct loading of the network. Note that `net` is only available if we have trained the model in this session.
 
-# In[ ]:
+# In[158]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\nprint(list(net.parameters()))\n')
 
 
-# In[ ]:
+# In[159]:
 
 
 print(list(net_loaded.parameters()))
 
 
-# In[ ]:
+# In[160]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n# Set the network to evaluation mode\nnet.eval()\n')
 
 
-# In[ ]:
+# In[161]:
 
 
 rho_example, vx_example, vy_example, vz_example, epsilon_example = sample_primitive_variables(20)
@@ -1626,20 +1561,20 @@ inputs =  generate_input_data(rho_example, vx_example, vy_example, vz_example, e
 inputs
 
 
-# In[ ]:
+# In[162]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n# Pass the inputs to the network and get the outputs\noutputs = [net(input) for input in inputs]\n# Print the outputs\noutputs\n')
 
 
-# In[ ]:
+# In[163]:
 
 
 # Set the network to evaluation mode
 net_loaded.eval()
 
 
-# In[ ]:
+# In[164]:
 
 
 # Pass the inputs to the network and get the outputs
