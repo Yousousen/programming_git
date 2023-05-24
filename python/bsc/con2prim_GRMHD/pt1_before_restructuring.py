@@ -55,7 +55,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[37]:
+# In[ ]:
 
 
 import os
@@ -78,13 +78,13 @@ def save_file(file_name):
     pass
 
 
-# In[38]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
 
 
-# In[39]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX\n')
@@ -92,7 +92,7 @@ get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna t
 
 # Importing the **libraries**,
 
-# In[40]:
+# In[5]:
 
 
 import numpy as np
@@ -106,15 +106,17 @@ import tensorboardX as tbx
 import pandas as pd
 
 
-# In[41]:
+# In[6]:
 
+
+##################################################     Debugging OPEN     ##################################################
 
 # def check_for_nan(values, name):
 #     if torch.any(torch.isnan(values)):
 #         print(f"NaN values found in {name}")
 
 
-# In[42]:
+# In[7]:
 
 
 import numpy as np
@@ -129,13 +131,15 @@ def check_for_nan(local_vars):
             if np.isnan(value):
                 print(f"Variable {var_name} is NaN!")
 
+##################################################     Debugging CLOSE     ##################################################
+
 
 # ### Constants and flags to set
 # Defining some constants and parameters for convenience.
 # 
 # **NOTE**: Some **subparameters** still need to be adjusted in the `create_model` function itself as of (Tue May 16 07:42:45 AM CEST 2023) in the case the model is being trained without optimization.
 
-# In[145]:
+# In[8]:
 
 
 # Checking if GPU is available and setting the device accordingly
@@ -172,7 +176,7 @@ Gamma = 5 / 3  # Adiabatic index
 #betay = 1 # Shift y
 #betaz = 1 # Shift z
 n_train_samples = 80000 # Number of training samples
-n_test_samples = 10000 # Number of test samples
+n_test_samples = 20000 # Number of test samples
 # TODO: Make the intervals correspond to something that works in GR in general, for right now (Sun May 21 06:02:10 PM CEST 2023) the intervals are a mix of Dieselhorst et al., the minimum to maximum speed and dummy intervals.
 rho_interval = (0, 2) # sample in linear space
 epsilon_interval = (1e-9, 1500)  # sample in log space
@@ -183,12 +187,23 @@ vz_interval = (0, 0.999)  # sample in linear space
 Bx_interval = (-10, 10)  # sample in linear space
 By_interval = (-10, 10)  # sample in linear space
 Bz_interval = (-10, 10)  # sample in linear space
-gxx_interval = (0, 0.3)
-gxy_interval = (0, 0.3)
-gxz_interval = (0, 0.3)
-gyy_interval = (0, 0.3)
-gyz_interval = (0, 0.3)
-gzz_interval = (0, 0.3)
+gxx_interval = (0.9, 1.1)
+gxy_interval = (0, 0.1)
+gxz_interval = (0, 0.1)
+gyy_interval = (0.9, 1.1)
+gyz_interval = (0, 0.1)
+gzz_interval = (0.9, 1.1)
+
+
+##################################################     Debugging OPEN     ##################################################
+# term1 = gxx * gyy * gzz
+# term2 = 2 * gxy * gxz * gyz
+# term3 = -gxx * gyz ** 2
+# term4 = -gyy * gxz ** 2
+# term5 = -gzz * gxy ** 2
+# term6 = term1 + term2 + term3 + term4 + term5
+# result = term6 ** 0.5
+##################################################     Debugging CLOSE     ##################################################
 
 
 N_INPUTS = 14  # Number of input features.
@@ -200,7 +215,13 @@ N_INPUTS = 14  # Number of input features.
 # 
 # We either generate the data or load the data. First the definitions for generating the data come below.
 
-# In[146]:
+# In[9]:
+
+
+np.logspace(*np.log10(epsilon_interval), num=1)[0]
+
+
+# In[12]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -217,40 +238,79 @@ def eos_analytic(rho, epsilon):
 
 
 
-# Defining a function that samples primitive variables from uniform distributions
-def sample_primitive_variables(n_samples):
-    rho = np.random.uniform(*rho_interval, size=n_samples)  
-    epsilon = np.logspace(*np.log10(epsilon_interval), num=n_samples)  
-    vx = np.random.uniform(*vx_interval, size=n_samples)  
-    vy = np.random.uniform(*vy_interval, size=n_samples)  
-    vz = np.random.uniform(*vz_interval, size=n_samples)  
-    # Replace those points whose vel^2 >= 1.0 with random values such that vel^2 < 1.0
-    velocity_squared = vx**2 + vy**2 + vz**2
-    mask = velocity_squared >= 1.0
-    check_for_nan(locals())
-    while np.any(mask):
-        vx[mask] = np.random.uniform(*vx_interval, size=np.sum(mask))
-        vy[mask] = np.random.uniform(*vy_interval, size=np.sum(mask))
-        vz[mask] = np.random.uniform(*vz_interval, size=np.sum(mask))
-        velocity_squared = vx**2 + vy**2 + vz**2
-        mask = velocity_squared >= 1.0
-    Bx = np.random.uniform(*Bx_interval, size=n_samples)  
-    By = np.random.uniform(*By_interval, size=n_samples)  
-    Bz = np.random.uniform(*Bz_interval, size=n_samples)  
-    gxx = np.random.uniform(*gxx_interval, size=n_samples)
-    gxy = np.random.uniform(*gxy_interval, size=n_samples)
-    gxz = np.random.uniform(*gxz_interval, size=n_samples)
-    gyy = np.random.uniform(*gyy_interval, size=n_samples)
-    gyz = np.random.uniform(*gyz_interval, size=n_samples)
-    gzz = np.random.uniform(*gzz_interval, size=n_samples)
+def sample_primitive_variables():
+    rho = np.random.uniform(*rho_interval)  
+    epsilon = np.logspace(*np.log10(epsilon_interval))  
+    vx = np.random.uniform(*vx_interval)  
+    vy = np.random.uniform(*vy_interval)  
+    vz = np.random.uniform(*vz_interval)  
+    Bx = np.random.uniform(*Bx_interval)  
+    By = np.random.uniform(*By_interval)  
+    Bz = np.random.uniform(*Bz_interval)  
+    gxx = np.random.uniform(*gxx_interval)
+    gxy = np.random.uniform(*gxy_interval)
+    gxz = np.random.uniform(*gxz_interval)
+    gyy = np.random.uniform(*gyy_interval)
+    gyz = np.random.uniform(*gyz_interval)
+    gzz = np.random.uniform(*gzz_interval)
 
     return rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy, gyz, gzz
 
+def check_sample(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy, gyz, gzz):
+    wtemp_expr = 1 - (gxx * vx**2 + gyy * vy**2 + gzz * vz**2 + 2 * gxy * vx * vy + 2 * gxz * vx * vz + 2 * gyz * vy * vz)
+    sdet_expr = gxx * gyy * gzz + 2 * gxy * gxz * gyz - gxx * gyz ** 2 - gyy * gxz ** 2 - gzz * gxy ** 2
+    if vx**2 + vy**2 + vz**2 >= 1 or wtemp_expr < 0 or sdet_expr < 0:
+        print(f"Sample failed checks. vx^2+vy^2+vz^2: {vx**2 + vy**2 + vz**2}, wtemp_expr: {wtemp_expr}, sdet_expr: {sdet_expr}")
+        return False
+    else:
+        print(f"Sample passed checks. vx^2+vy^2+vz^2: {vx**2 + vy**2 + vz**2}, wtemp_expr: {wtemp_expr}, sdet_expr: {sdet_expr}")
+        return True
 
+def generate_samples(n_samples):
+    samples = []
+    while len(samples) < n_samples:
+        sample = sample_primitive_variables()
+        if check_sample(*sample):
+            samples.append(sample)
+        print(f"Number of valid samples: {len(samples)}")
+    return zip(*samples)
+
+
+##################################################     Debugging OPEN     ##################################################
+
+# def sdet(gxx, gxy, gxz, gyy, gyz, gzz):
+#     # Determinant of the three metric.
+#     return (gxx * gyy * gzz + 2 * gxy * gxz * gyz - gxx * gyz ** 2 - gyy * gxz ** 2 - gzz * gxy ** 2) ** 0.5
 
 def sdet(gxx, gxy, gxz, gyy, gyz, gzz):
     # Determinant of the three metric.
-    return (gxx * gyy * gzz + 2 * gxy * gxz * gyz - gxx * gyz ** 2 - gyy * gxz ** 2 - gzz * gxy ** 2) ** 0.5
+    term1 = gxx * gyy * gzz
+    term2 = 2 * gxy * gxz * gyz
+    term3 = -gxx * gyz ** 2
+    term4 = -gyy * gxz ** 2
+    term5 = -gzz * gxy ** 2
+    term6 = term1 + term2 + term3 + term4 + term5
+    result = term6 ** 0.5
+
+
+    # print("term1:", term1)
+    # print("term2:", term2)
+    # print("term3:", term3)
+    # print("term4:", term4)
+    # print("term5:", term5)
+    # print("term6:", term6)
+    # print("result:", result)
+
+    # check_for_nan(locals())
+
+    num_negative_values = torch.sum(torch.lt(term6, 0)).item()
+    print("Number of occurrences where term6 is negative:", num_negative_values)
+
+
+
+    return result
+
+##################################################     Debugging CLOSE     ##################################################
 
 
 # Defining a function that computes conserved variables from primitive variables
@@ -259,9 +319,7 @@ def compute_conserved_variables(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, 
     wtemp = 1 / (1 - (gxx * vx**2 + gyy * vy**2 + gzz * vz**2 +
         2 * gxy * vx * vy + 2 * gxz * vx * vz +
         2 * gyz * vy * vz))**0.5
-
-
-    ##################################################     Debugging     ##################################################
+    ##################################################     Debugging OPEN    ##################################################
     denominator = (gxx * vx**2 + gyy * vy**2 + gzz * vz**2 +
                 2 * gxy * vx * vy + 2 * gxz * vx * vz +
                 2 * gyz * vy * vz)
@@ -337,7 +395,7 @@ def compute_conserved_variables(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, 
     # print("Is there any NaN in wtemp?", is_nan_wtemp)
     # check_for_nan(locals())
 
-    ##################################################     Debugging     ##################################################
+    ##################################################     Debugging CLOSE     ##################################################
 
     vlowx = gxx * vx + gxy * vy + gxz * vz
     vlowy = gxy * vx + gyy * vy + gyz * vz
@@ -415,7 +473,7 @@ def generate_labels(rho, epsilon):
 
 # ### Generating or loading input data and labels
 
-# In[150]:
+# In[11]:
 
 
 if LOAD_DATA_FROM_CSV:
@@ -436,8 +494,8 @@ if LOAD_DATA_FROM_CSV:
     rho_test = epsilon_test = vx_test = vy_test = vz_test = Bx_test = By_test = Bz_test = None
 else:
     # Sample primitive variables
-    rho_train, epsilon_train, vx_train, vy_train, vz_train, Bx_train, By_train, Bz_train, gxx_train, gxy_train, gxz_train, gyy_train, gyz_train, gzz_train = sample_primitive_variables(n_train_samples)
-    rho_test, epsilon_test, vx_test, vy_test, vz_test, Bx_test, By_test, Bz_test, gxx_test, gxy_test, gxz_test, gyy_test, gyz_test, gzz_test = sample_primitive_variables(n_test_samples)
+    rho_train, epsilon_train, vx_train, vy_train, vz_train, Bx_train, By_train, Bz_train, gxx_train, gxy_train, gxz_train, gyy_train, gyz_train, gzz_train = generate_samples(n_train_samples)
+    rho_test, epsilon_test, vx_test, vy_test, vz_test, Bx_test, By_test, Bz_test, gxx_test, gxy_test, gxz_test, gyy_test, gyz_test, gzz_test = generate_samples(n_test_samples)
 
 
     # Generate data and labels.
@@ -471,7 +529,7 @@ x_test
 y_test
 
 
-# In[101]:
+# In[ ]:
 
 
 torch.isnan(x_train).any()
@@ -480,7 +538,7 @@ torch.isnan(y_train).any()
 torch.isnan(y_test).any()
 
 
-# In[92]:
+# In[ ]:
 
 
 nan_mask_train = torch.isnan(x_train)     # get a boolean mask indicating NaN values
@@ -498,7 +556,7 @@ len(nan_indices_test)
 
 # ### Visualizing sampled data
 
-# In[93]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -520,13 +578,13 @@ if not LOAD_DATA_FROM_CSV:
     Bz_test
 
 
-# In[94]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[95]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -564,13 +622,13 @@ if not LOAD_DATA_FROM_CSV:
     plt.show()
 
 
-# In[96]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[97]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -591,7 +649,7 @@ if not LOAD_DATA_FROM_CSV:
 
 # ### Data normalization
 
-# In[98]:
+# In[ ]:
 
 
 # Computing summary statistics of the input variables before and after z-score normalization
@@ -601,13 +659,13 @@ print(torch.stack([torch.min(x_train, dim=0).values, torch.max(x_train, dim=0).v
 
 # Perform z-score normalization
 
-# In[99]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
 
 
-# In[100]:
+# In[ ]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -654,13 +712,13 @@ if ZSCORE_NORMALIZATION:
 
 # Plotting the histograms of the input data after normalization if z-score normalization was performed.
 
-# In[101]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[102]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -680,7 +738,7 @@ if not LOAD_DATA_FROM_CSV:
         plt.show()
 
 
-# In[103]:
+# In[ ]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -691,7 +749,7 @@ if ZSCORE_NORMALIZATION:
 
 # ### Visualizing input data and labels
 
-# In[104]:
+# In[ ]:
 
 
 x_train
@@ -702,7 +760,7 @@ y_test
 
 # Checking if our output is always positive by plotting a histogram of y_train and y_test tensors 
 
-# In[105]:
+# In[ ]:
 
 
 # Note how we are only plotting train.
@@ -721,7 +779,7 @@ plt.tight_layout()
 plt.show()
 
 
-# In[106]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -729,7 +787,7 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 # ## Defining the neural network
 
-# In[107]:
+# In[ ]:
 
 
 # Defining a class for the network
@@ -798,7 +856,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[108]:
+# In[ ]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -1016,7 +1074,7 @@ def create_model(trial, optimize):
 # 
 #  We first define a couple of functions used in the training and evaluation.
 
-# In[109]:
+# In[ ]:
 
 
 # Defining a function that computes loss and metrics for a given batch
@@ -1076,7 +1134,7 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[110]:
+# In[ ]:
 
 
 # Defining a function to train and evaluate a network
@@ -1244,7 +1302,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
 # ## The objective function and hyperparameter tuning
 
-# In[111]:
+# In[ ]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -1282,7 +1340,7 @@ def objective(trial):
     return test_metrics[-1]["l1_norm"]
 
 
-# In[112]:
+# In[ ]:
 
 
 if OPTIMIZE:
@@ -1303,7 +1361,7 @@ if OPTIMIZE:
 
 # ## Training the model
 
-# In[113]:
+# In[ ]:
 
 
 # Creating the best network and optimizer using the best hyperparameters
@@ -1340,7 +1398,7 @@ else:
     lr = create_model(trial=None, optimize=False)
 
 
-# In[114]:
+# In[ ]:
 
 
 print("loss_fn:", loss_fn)
@@ -1356,7 +1414,7 @@ print("hidden_activation:", hidden_activation)
 print("output_activation:", output_activation)
 
 
-# In[115]:
+# In[ ]:
 
 
 # Training and evaluating the network using the train_and_eval function
@@ -1816,7 +1874,7 @@ traced_model = torch.jit.trace(net_loaded, dummy_input)
 traced_model.save("net.pt")
 save_file("net.pt")
 
-example_input_to_validate_correct_export_and_import = generate_input_data(*sample_primitive_variables(1))
+example_input_to_validate_correct_export_and_import = generate_input_data(*generate_samples(1))
 print("input shape: ", example_input_to_validate_correct_export_and_import.shape)
 print("input: ", example_input_to_validate_correct_export_and_import)
 print("Output:", net_loaded(example_input_to_validate_correct_export_and_import))
