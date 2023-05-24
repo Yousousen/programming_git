@@ -55,7 +55,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[ ]:
+# In[37]:
 
 
 import os
@@ -78,13 +78,13 @@ def save_file(file_name):
     pass
 
 
-# In[ ]:
+# In[38]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
 
 
-# In[86]:
+# In[39]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX\n')
@@ -92,7 +92,7 @@ get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna t
 
 # Importing the **libraries**,
 
-# In[87]:
+# In[40]:
 
 
 import numpy as np
@@ -106,7 +106,7 @@ import tensorboardX as tbx
 import pandas as pd
 
 
-# In[118]:
+# In[41]:
 
 
 # def check_for_nan(values, name):
@@ -114,7 +114,7 @@ import pandas as pd
 #         print(f"NaN values found in {name}")
 
 
-# In[120]:
+# In[42]:
 
 
 import numpy as np
@@ -135,7 +135,7 @@ def check_for_nan(local_vars):
 # 
 # **NOTE**: Some **subparameters** still need to be adjusted in the `create_model` function itself as of (Tue May 16 07:42:45 AM CEST 2023) in the case the model is being trained without optimization.
 
-# In[88]:
+# In[145]:
 
 
 # Checking if GPU is available and setting the device accordingly
@@ -174,7 +174,7 @@ Gamma = 5 / 3  # Adiabatic index
 n_train_samples = 80000 # Number of training samples
 n_test_samples = 10000 # Number of test samples
 # TODO: Make the intervals correspond to something that works in GR in general, for right now (Sun May 21 06:02:10 PM CEST 2023) the intervals are a mix of Dieselhorst et al., the minimum to maximum speed and dummy intervals.
-rho_interval = (1e-9, 2) # sample in linear space
+rho_interval = (0, 2) # sample in linear space
 epsilon_interval = (1e-9, 1500)  # sample in log space
 # Invalid values for the velocities will be masked in sample_primitive_variables.
 vx_interval = (0, 0.999)  # sample in linear space
@@ -183,24 +183,24 @@ vz_interval = (0, 0.999)  # sample in linear space
 Bx_interval = (-10, 10)  # sample in linear space
 By_interval = (-10, 10)  # sample in linear space
 Bz_interval = (-10, 10)  # sample in linear space
-gxx_interval = (1e-9, 1.5)
-gxy_interval = (1e-9, 1.5)
-gxz_interval = (1e-9, 1.5)
-gyy_interval = (1e-9, 1.5)
-gyz_interval = (1e-9, 1.5)
-gzz_interval = (1e-9, 1.5)
+gxx_interval = (0, 0.3)
+gxy_interval = (0, 0.3)
+gxz_interval = (0, 0.3)
+gyy_interval = (0, 0.3)
+gyz_interval = (0, 0.3)
+gzz_interval = (0, 0.3)
 
 
 N_INPUTS = 14  # Number of input features.
 
-np.random.seed(45) # Comment for true random data.
+# np.random.seed(45) # Comment for true random data.
 
 
 # ## Input data and labels
 # 
 # We either generate the data or load the data. First the definitions for generating the data come below.
 
-# In[35]:
+# In[146]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -260,6 +260,8 @@ def compute_conserved_variables(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, 
         2 * gxy * vx * vy + 2 * gxz * vx * vz +
         2 * gyz * vy * vz))**0.5
 
+
+    ##################################################     Debugging     ##################################################
     denominator = (gxx * vx**2 + gyy * vy**2 + gzz * vz**2 +
                 2 * gxy * vx * vy + 2 * gxz * vx * vz +
                 2 * gyz * vy * vz)
@@ -267,26 +269,60 @@ def compute_conserved_variables(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, 
     # is_nan_denominator = torch.isnan(denominator).any()
     # print("Is there any NaN in the denominator?", is_nan_denominator)
 
-    square_root_part = (1 - denominator)**0.5
+    # square_root_part = (1 - denominator)**0.5
 
-    is_nan_square_root_part = torch.isnan(square_root_part).any()
-    print("Is there any NaN in the square root part?", is_nan_square_root_part)
+    # is_nan_square_root_part = torch.isnan(square_root_part).any()
+    # print("Is there any NaN in the square root part?", is_nan_square_root_part)
 
-    num_nan_values = torch.isnan(square_root_part).sum().item()
-    print("Number of NaN values in the square root part:", num_nan_values)
+    # num_nan_values = torch.isnan(square_root_part).sum().item()
+    # print("Number of NaN values in the square root part:", num_nan_values)
 
     is_negative = torch.lt(1 - denominator, 0)
     num_negative_values = torch.sum(is_negative).item()
 
     print("Number of occurrences where 1 - denominator is negative:", num_negative_values)
 
-    # Convert the square root part to a complex tensor
-    square_root_part_complex = square_root_part.type(torch.complex64)
+    # for gxx_val in gxx:
+    #     for gyy_val in gyy:
+    #         for gzz_val in gzz:
+    #             for gxy_val in gxy:
+    #                 for gxz_val in gxz:
+    #                     for gyz_val in gyz:
+    #                         for vx_val in vx:
+    #                             for vy_val in vy:
+    #                                 for vz_val in vz:
+    #                                     for Bx_val in Bx:
+    #                                         for By_val in By:
+    #                                             for Bz_val in Bz:
+    #                                                 denominator_val = (gxx_val * vx_val**2 + gyy_val * vy_val**2 + gzz_val * vz_val**2 +
+    #                                                             2 * gxy_val * vx_val * vy_val + 2 * gxz_val * vx_val * vz_val +
+    #                                                             2 * gyz_val * vy_val * vz_val)
+    #                                                 result = 1 - denominator_val
+    #                                                 if result < 0:
+    #                                                     print("gxx:", gxx_val)
+    #                                                     print("gyy:", gyy_val)
+    #                                                     print("gzz:", gzz_val)
+    #                                                     print("gxy:", gxy_val)
+    #                                                     print("gxz:", gxz_val)
+    #                                                     print("gyz:", gyz_val)
+    #                                                     print("vx:", vx_val)
+    #                                                     print("vy:", vy_val)
+    #                                                     print("vz:", vz_val)
+    #                                                     print("Bx:", Bx_val)
+    #                                                     print("By:", By_val)
+    #                                                     print("Bz:", Bz_val)
+    #                                                     print("1 - term:", result)
+    #                                                     print("-----------------------------")
 
-    is_imaginary = torch.abs(square_root_part_complex.imag) > 0  # Check if imaginary part is non-zero
-    num_imaginary_values = torch.sum(is_imaginary).item()
 
-    print("Number of occurrences where the square root part is imaginary:", num_imaginary_values)
+
+    # # Convert the square root part to a complex tensor
+    # square_root_part_complex = square_root_part.type(torch.complex64)
+
+    # is_imaginary = torch.abs(square_root_part_complex.imag) > 0  # Check if imaginary part is non-zero
+    # num_imaginary_values = torch.sum(is_imaginary).item()
+
+    # print("Number of occurrences where the square root part is imaginary:", num_imaginary_values)
 
 
 
@@ -300,6 +336,8 @@ def compute_conserved_variables(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, 
     # is_nan_wtemp = torch.isnan(wtemp).any()
     # print("Is there any NaN in wtemp?", is_nan_wtemp)
     # check_for_nan(locals())
+
+    ##################################################     Debugging     ##################################################
 
     vlowx = gxx * vx + gxy * vy + gxz * vz
     vlowy = gxy * vx + gyy * vy + gyz * vz
@@ -377,7 +415,7 @@ def generate_labels(rho, epsilon):
 
 # ### Generating or loading input data and labels
 
-# In[163]:
+# In[150]:
 
 
 if LOAD_DATA_FROM_CSV:
@@ -433,7 +471,7 @@ x_test
 y_test
 
 
-# In[91]:
+# In[101]:
 
 
 torch.isnan(x_train).any()
