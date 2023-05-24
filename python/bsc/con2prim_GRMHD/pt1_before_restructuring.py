@@ -55,7 +55,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[84]:
+# In[ ]:
 
 
 import os
@@ -78,7 +78,7 @@ def save_file(file_name):
     pass
 
 
-# In[85]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
@@ -104,6 +104,30 @@ import torch.nn.functional as F
 import optuna
 import tensorboardX as tbx
 import pandas as pd
+
+
+# In[118]:
+
+
+# def check_for_nan(values, name):
+#     if torch.any(torch.isnan(values)):
+#         print(f"NaN values found in {name}")
+
+
+# In[120]:
+
+
+import numpy as np
+import torch
+
+def check_for_nan(local_vars):
+    for var_name, value in local_vars.items():
+        if isinstance(value, (np.ndarray, torch.Tensor)):
+            if np.isnan(value).any():
+                print(f"Variable {var_name} contains NaN values!")
+        elif isinstance(value, (float, int)):
+            if np.isnan(value):
+                print(f"Variable {var_name} is NaN!")
 
 
 # ### Constants and flags to set
@@ -142,6 +166,7 @@ N_EPOCHS_NO_OPT = 2
 SCHEDULER_NAME_NO_OPT = "ReduceLROnPlateau"
 
 Gamma = 5 / 3  # Adiabatic index
+#gamma_det = 1 # Determinant of gamma_ij.
 #alpha = 1 # Lapse function.
 ##betax = 1 # Shift x
 #betay = 1 # Shift y
@@ -175,7 +200,7 @@ np.random.seed(45) # Comment for true random data.
 # 
 # We either generate the data or load the data. First the definitions for generating the data come below.
 
-# In[89]:
+# In[35]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -202,6 +227,7 @@ def sample_primitive_variables(n_samples):
     # Replace those points whose vel^2 >= 1.0 with random values such that vel^2 < 1.0
     velocity_squared = vx**2 + vy**2 + vz**2
     mask = velocity_squared >= 1.0
+    check_for_nan(locals())
     while np.any(mask):
         vx[mask] = np.random.uniform(*vx_interval, size=np.sum(mask))
         vy[mask] = np.random.uniform(*vy_interval, size=np.sum(mask))
@@ -217,6 +243,7 @@ def sample_primitive_variables(n_samples):
     gyy = np.random.uniform(*gyy_interval, size=n_samples)
     gyz = np.random.uniform(*gyz_interval, size=n_samples)
     gzz = np.random.uniform(*gzz_interval, size=n_samples)
+
     return rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy, gyz, gzz
 
 
@@ -233,6 +260,46 @@ def compute_conserved_variables(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, 
         2 * gxy * vx * vy + 2 * gxz * vx * vz +
         2 * gyz * vy * vz))**0.5
 
+    denominator = (gxx * vx**2 + gyy * vy**2 + gzz * vz**2 +
+                2 * gxy * vx * vy + 2 * gxz * vx * vz +
+                2 * gyz * vy * vz)
+
+    # is_nan_denominator = torch.isnan(denominator).any()
+    # print("Is there any NaN in the denominator?", is_nan_denominator)
+
+    square_root_part = (1 - denominator)**0.5
+
+    is_nan_square_root_part = torch.isnan(square_root_part).any()
+    print("Is there any NaN in the square root part?", is_nan_square_root_part)
+
+    num_nan_values = torch.isnan(square_root_part).sum().item()
+    print("Number of NaN values in the square root part:", num_nan_values)
+
+    is_negative = torch.lt(1 - denominator, 0)
+    num_negative_values = torch.sum(is_negative).item()
+
+    print("Number of occurrences where 1 - denominator is negative:", num_negative_values)
+
+    # Convert the square root part to a complex tensor
+    square_root_part_complex = square_root_part.type(torch.complex64)
+
+    is_imaginary = torch.abs(square_root_part_complex.imag) > 0  # Check if imaginary part is non-zero
+    num_imaginary_values = torch.sum(is_imaginary).item()
+
+    print("Number of occurrences where the square root part is imaginary:", num_imaginary_values)
+
+
+
+    # term_after_1_minus = denominator
+
+    # is_nan_term_after_1_minus = torch.isnan(term_after_1_minus).any()
+    # print("Is there any NaN in the term after 1- in the square root part?", is_nan_term_after_1_minus)
+
+    # wtemp = 1 / square_root_part
+
+    # is_nan_wtemp = torch.isnan(wtemp).any()
+    # print("Is there any NaN in wtemp?", is_nan_wtemp)
+    # check_for_nan(locals())
 
     vlowx = gxx * vx + gxy * vy + gxz * vz
     vlowy = gxy * vx + gyy * vy + gyz * vz
@@ -292,7 +359,6 @@ def generate_input_data(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy
 
     # Add gxx, gxy, gxz, gyy, gyz, gzz to the tensor
     x = torch.stack([D, Sx, Sy, Sz, tau, Bscriptx, Bscripty, Bscriptz, gxx, gxy, gxz, gyy, gyz, gzz], axis=1)
-
     return x
 
 
@@ -311,7 +377,7 @@ def generate_labels(rho, epsilon):
 
 # ### Generating or loading input data and labels
 
-# In[90]:
+# In[163]:
 
 
 if LOAD_DATA_FROM_CSV:
