@@ -55,7 +55,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[ ]:
+# In[2]:
 
 
 import os
@@ -78,13 +78,13 @@ def save_file(file_name):
     pass
 
 
-# In[ ]:
+# In[3]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
 
 
-# In[ ]:
+# In[4]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX\n')
@@ -221,7 +221,7 @@ N_INPUTS = 14  # Number of input features.
 np.logspace(*np.log10(epsilon_interval), num=1)[0]
 
 
-# In[12]:
+# In[10]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -433,20 +433,36 @@ def compute_conserved_variables(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, 
 
 def generate_input_data(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy, gyz, gzz):
     
-    rho = torch.tensor(rho, dtype=torch.float32).to(device)
-    epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
-    vx = torch.tensor(vx, dtype=torch.float32).to(device)
-    vy = torch.tensor(vy, dtype=torch.float32).to(device)
-    vz = torch.tensor(vz, dtype=torch.float32).to(device)
-    Bx = torch.tensor(Bx, dtype=torch.float32).to(device)
-    By = torch.tensor(By, dtype=torch.float32).to(device)
-    Bz = torch.tensor(Bz, dtype=torch.float32).to(device)
-    gxx = torch.tensor(gxx, dtype=torch.float32).to(device)
-    gxy = torch.tensor(gxy, dtype=torch.float32).to(device)
-    gxz = torch.tensor(gxz, dtype=torch.float32).to(device)
-    gyy = torch.tensor(gyy, dtype=torch.float32).to(device)
-    gyz = torch.tensor(gyz, dtype=torch.float32).to(device)
-    gzz = torch.tensor(gzz, dtype=torch.float32).to(device)
+    # rho = torch.tensor(rho, dtype=torch.float32).to(device)
+    # epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
+    # vx = torch.tensor(vx, dtype=torch.float32).to(device)
+    # vy = torch.tensor(vy, dtype=torch.float32).to(device)
+    # vz = torch.tensor(vz, dtype=torch.float32).to(device)
+    # Bx = torch.tensor(Bx, dtype=torch.float32).to(device)
+    # By = torch.tensor(By, dtype=torch.float32).to(device)
+    # Bz = torch.tensor(Bz, dtype=torch.float32).to(device)
+    # gxx = torch.tensor(gxx, dtype=torch.float32).to(device)
+    # gxy = torch.tensor(gxy, dtype=torch.float32).to(device)
+    # gxz = torch.tensor(gxz, dtype=torch.float32).to(device)
+    # gyy = torch.tensor(gyy, dtype=torch.float32).to(device)
+    # gyz = torch.tensor(gyz, dtype=torch.float32).to(device)
+    # gzz = torch.tensor(gzz, dtype=torch.float32).to(device)
+
+    rho = torch.tensor(np.array(rho), dtype=torch.float32).to(device)
+    epsilon = torch.tensor(np.array(epsilon), dtype=torch.float32).to(device)
+    vx = torch.tensor(np.array(vx), dtype=torch.float32).to(device)
+    vy = torch.tensor(np.array(vy), dtype=torch.float32).to(device)
+    vz = torch.tensor(np.array(vz), dtype=torch.float32).to(device)
+    Bx = torch.tensor(np.array(Bx), dtype=torch.float32).to(device)
+    By = torch.tensor(np.array(By), dtype=torch.float32).to(device)
+    Bz = torch.tensor(np.array(Bz), dtype=torch.float32).to(device)
+    gxx = torch.tensor(np.array(gxx), dtype=torch.float32).to(device)
+    gxy = torch.tensor(np.array(gxy), dtype=torch.float32).to(device)
+    gxz = torch.tensor(np.array(gxz), dtype=torch.float32).to(device)
+    gyy = torch.tensor(np.array(gyy), dtype=torch.float32).to(device)
+    gyz = torch.tensor(np.array(gyz), dtype=torch.float32).to(device)
+    gzz = torch.tensor(np.array(gzz), dtype=torch.float32).to(device)
+
 
     
     D, Sx, Sy, Sz, tau, Bscriptx, Bscripty, Bscriptz = compute_conserved_variables(
@@ -461,8 +477,12 @@ def generate_input_data(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy
 # Defining a function that generates output data (labels) from given samples of primitive variables
 def generate_labels(rho, epsilon):
     # Converting the numpy arrays to torch tensors and moving them to the device
-    rho = torch.tensor(rho, dtype=torch.float32).to(device)
-    epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
+    # rho = torch.tensor(rho, dtype=torch.float32).to(device)
+    # epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
+
+    # Converting the numpy arrays to torch tensors and moving them to the device
+    rho = torch.tensor(np.array(rho), dtype=torch.float32).to(device)
+    epsilon = torch.tensor(np.array(epsilon), dtype=torch.float32).to(device)
    
     # Computing the pressure from the primitive variables using the EOS
     p = eos_analytic(rho, epsilon)
