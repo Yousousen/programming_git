@@ -55,7 +55,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[139]:
+# In[ ]:
 
 
 import os
@@ -78,13 +78,13 @@ def save_file(file_name):
     pass
 
 
-# In[140]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
 
 
-# In[141]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX\n')
@@ -92,7 +92,7 @@ get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna t
 
 # Importing the **libraries**,
 
-# In[142]:
+# In[ ]:
 
 
 import numpy as np
@@ -106,40 +106,12 @@ import tensorboardX as tbx
 import pandas as pd
 
 
-# In[143]:
-
-
-##################################################     Debugging OPEN     ##################################################
-
-# def check_for_nan(values, name):
-#     if torch.any(torch.isnan(values)):
-#         print(f"NaN values found in {name}")
-
-
-# In[144]:
-
-
-import numpy as np
-import torch
-
-def check_for_nan(local_vars):
-    for var_name, value in local_vars.items():
-        if isinstance(value, (np.ndarray, torch.Tensor)):
-            if np.isnan(value).any():
-                print(f"Variable {var_name} contains NaN values!")
-        elif isinstance(value, (float, int)):
-            if np.isnan(value):
-                print(f"Variable {var_name} is NaN!")
-
-##################################################     Debugging CLOSE     ##################################################
-
-
 # ### Constants and flags to set
 # Defining some constants and parameters for convenience.
 # 
 # **NOTE**: Some **subparameters** still need to be adjusted in the `create_model` function itself as of (Tue May 16 07:42:45 AM CEST 2023) in the case the model is being trained without optimization.
 
-# In[145]:
+# In[ ]:
 
 
 # Checking if GPU is available and setting the device accordingly
@@ -148,7 +120,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 N_TRIALS = 250 # Number of trials for hyperparameter optimization
 OPTIMIZE = False # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
 ZSCORE_NORMALIZATION = False # Whether to z-score normalize the input data.
-LOAD_DATA_FROM_CSV = False  # If not true we generate the data in this file and save to {x_train,y_train,x_test,y_test}.csv, otherwise we load the data from files of the same name.
+LOAD_DATA_FROM_CSV = True  # If not true we generate the data in this file and save to {x_train,y_train,x_test,y_test}.csv, otherwise we load the data from files of the same name.
 
 csv_filenames = { # File names to load input data and labels from if LOAD_DATA_FROM_CSV is True.
     "x_train": "x_train.csv",
@@ -170,14 +142,8 @@ N_EPOCHS_NO_OPT = 10
 SCHEDULER_NAME_NO_OPT = "ReduceLROnPlateau"
 
 Gamma = 5 / 3  # Adiabatic index
-#gamma_det = 1 # Determinant of gamma_ij.
-#alpha = 1 # Lapse function.
-##betax = 1 # Shift x
-#betay = 1 # Shift y
-#betaz = 1 # Shift z
 n_train_samples = 80000 # Number of training samples
 n_test_samples = 20000 # Number of test samples
-# TODO: Make the intervals correspond to something that works in GR in general, for right now (Sun May 21 06:02:10 PM CEST 2023) the intervals are a mix of Dieselhorst et al., the minimum to maximum speed and dummy intervals.
 rho_interval = (0, 2) # sample in linear space
 epsilon_interval = (1e-9, 1500)  # sample in log space
 # Invalid values for the velocities will be masked in sample_primitive_variables.
@@ -195,17 +161,6 @@ gyz_interval = (0, 0.1)
 gzz_interval = (0.9, 1.1)
 
 
-##################################################     Debugging OPEN     ##################################################
-# term1 = gxx * gyy * gzz
-# term2 = 2 * gxy * gxz * gyz
-# term3 = -gxx * gyz ** 2
-# term4 = -gyy * gxz ** 2
-# term5 = -gzz * gxy ** 2
-# term6 = term1 + term2 + term3 + term4 + term5
-# result = term6 ** 0.5
-##################################################     Debugging CLOSE     ##################################################
-
-
 N_INPUTS = 14  # Number of input features.
 
 np.random.seed(46) # Comment for true random data.
@@ -215,13 +170,7 @@ np.random.seed(46) # Comment for true random data.
 # 
 # We either generate the data or load the data. First the definitions for generating the data come below.
 
-# In[146]:
-
-
-np.logspace(*np.log10(epsilon_interval), num=1)[0]
-
-
-# In[147]:
+# In[ ]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -279,42 +228,9 @@ def generate_samples(n_samples):
     return zip(*samples)
 
 
-##################################################     Debugging OPEN     ##################################################
-
-# def sdet(gxx, gxy, gxz, gyy, gyz, gzz):
-#     # Determinant of the three metric.
-#     return (gxx * gyy * gzz + 2 * gxy * gxz * gyz - gxx * gyz ** 2 - gyy * gxz ** 2 - gzz * gxy ** 2) ** 0.5
-
 def sdet(gxx, gxy, gxz, gyy, gyz, gzz):
     # Determinant of the three metric.
-    term1 = gxx * gyy * gzz
-    term2 = 2 * gxy * gxz * gyz
-    term3 = -gxx * gyz ** 2
-    term4 = -gyy * gxz ** 2
-    term5 = -gzz * gxy ** 2
-    term6 = term1 + term2 + term3 + term4 + term5
-    result = term6 ** 0.5
-
-
-    # print("term1:", term1)
-    # print("term2:", term2)
-    # print("term3:", term3)
-    # print("term4:", term4)
-    # print("term5:", term5)
-    # print("term6:", term6)
-    # print("result:", result)
-
-    # check_for_nan(locals())
-
-    num_negative_values = torch.sum(torch.lt(term6, 0)).item()
-    print("Number of occurrences where term6 is negative:", num_negative_values)
-
-
-
-    return result
-
-##################################################     Debugging CLOSE     ##################################################
-
+    return (gxx * gyy * gzz + 2 * gxy * gxz * gyz - gxx * gyz ** 2 - gyy * gxz ** 2 - gzz * gxy ** 2) ** 0.5
 
 # Defining a function that computes conserved variables from primitive variables
 def compute_conserved_variables(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy, gyz, gzz):
@@ -322,83 +238,6 @@ def compute_conserved_variables(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, 
     wtemp = 1 / (1 - (gxx * vx**2 + gyy * vy**2 + gzz * vz**2 +
         2 * gxy * vx * vy + 2 * gxz * vx * vz +
         2 * gyz * vy * vz))**0.5
-    ##################################################     Debugging OPEN    ##################################################
-    denominator = (gxx * vx**2 + gyy * vy**2 + gzz * vz**2 +
-                2 * gxy * vx * vy + 2 * gxz * vx * vz +
-                2 * gyz * vy * vz)
-
-    # is_nan_denominator = torch.isnan(denominator).any()
-    # print("Is there any NaN in the denominator?", is_nan_denominator)
-
-    # square_root_part = (1 - denominator)**0.5
-
-    # is_nan_square_root_part = torch.isnan(square_root_part).any()
-    # print("Is there any NaN in the square root part?", is_nan_square_root_part)
-
-    # num_nan_values = torch.isnan(square_root_part).sum().item()
-    # print("Number of NaN values in the square root part:", num_nan_values)
-
-    is_negative = torch.lt(1 - denominator, 0)
-    num_negative_values = torch.sum(is_negative).item()
-
-    print("Number of occurrences where 1 - denominator is negative:", num_negative_values)
-
-    # for gxx_val in gxx:
-    #     for gyy_val in gyy:
-    #         for gzz_val in gzz:
-    #             for gxy_val in gxy:
-    #                 for gxz_val in gxz:
-    #                     for gyz_val in gyz:
-    #                         for vx_val in vx:
-    #                             for vy_val in vy:
-    #                                 for vz_val in vz:
-    #                                     for Bx_val in Bx:
-    #                                         for By_val in By:
-    #                                             for Bz_val in Bz:
-    #                                                 denominator_val = (gxx_val * vx_val**2 + gyy_val * vy_val**2 + gzz_val * vz_val**2 +
-    #                                                             2 * gxy_val * vx_val * vy_val + 2 * gxz_val * vx_val * vz_val +
-    #                                                             2 * gyz_val * vy_val * vz_val)
-    #                                                 result = 1 - denominator_val
-    #                                                 if result < 0:
-    #                                                     print("gxx:", gxx_val)
-    #                                                     print("gyy:", gyy_val)
-    #                                                     print("gzz:", gzz_val)
-    #                                                     print("gxy:", gxy_val)
-    #                                                     print("gxz:", gxz_val)
-    #                                                     print("gyz:", gyz_val)
-    #                                                     print("vx:", vx_val)
-    #                                                     print("vy:", vy_val)
-    #                                                     print("vz:", vz_val)
-    #                                                     print("Bx:", Bx_val)
-    #                                                     print("By:", By_val)
-    #                                                     print("Bz:", Bz_val)
-    #                                                     print("1 - term:", result)
-    #                                                     print("-----------------------------")
-
-
-
-    # # Convert the square root part to a complex tensor
-    # square_root_part_complex = square_root_part.type(torch.complex64)
-
-    # is_imaginary = torch.abs(square_root_part_complex.imag) > 0  # Check if imaginary part is non-zero
-    # num_imaginary_values = torch.sum(is_imaginary).item()
-
-    # print("Number of occurrences where the square root part is imaginary:", num_imaginary_values)
-
-
-
-    # term_after_1_minus = denominator
-
-    # is_nan_term_after_1_minus = torch.isnan(term_after_1_minus).any()
-    # print("Is there any NaN in the term after 1- in the square root part?", is_nan_term_after_1_minus)
-
-    # wtemp = 1 / square_root_part
-
-    # is_nan_wtemp = torch.isnan(wtemp).any()
-    # print("Is there any NaN in wtemp?", is_nan_wtemp)
-    # check_for_nan(locals())
-
-    ##################################################     Debugging CLOSE     ##################################################
 
     vlowx = gxx * vx + gxy * vy + gxz * vz
     vlowy = gxy * vx + gyy * vy + gyz * vz
@@ -435,22 +274,6 @@ def compute_conserved_variables(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, 
 
 
 def generate_input_data(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy, gyz, gzz):
-    
-    # rho = torch.tensor(rho, dtype=torch.float32).to(device)
-    # epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
-    # vx = torch.tensor(vx, dtype=torch.float32).to(device)
-    # vy = torch.tensor(vy, dtype=torch.float32).to(device)
-    # vz = torch.tensor(vz, dtype=torch.float32).to(device)
-    # Bx = torch.tensor(Bx, dtype=torch.float32).to(device)
-    # By = torch.tensor(By, dtype=torch.float32).to(device)
-    # Bz = torch.tensor(Bz, dtype=torch.float32).to(device)
-    # gxx = torch.tensor(gxx, dtype=torch.float32).to(device)
-    # gxy = torch.tensor(gxy, dtype=torch.float32).to(device)
-    # gxz = torch.tensor(gxz, dtype=torch.float32).to(device)
-    # gyy = torch.tensor(gyy, dtype=torch.float32).to(device)
-    # gyz = torch.tensor(gyz, dtype=torch.float32).to(device)
-    # gzz = torch.tensor(gzz, dtype=torch.float32).to(device)
-
     rho = torch.tensor(np.array(rho), dtype=torch.float32).to(device)
     epsilon = torch.tensor(np.array(epsilon), dtype=torch.float32).to(device)
     vx = torch.tensor(np.array(vx), dtype=torch.float32).to(device)
@@ -478,11 +301,9 @@ def generate_input_data(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy
 
 
 # Defining a function that generates output data (labels) from given samples of primitive variables
+# We use the definitions as given in Recovery schemes for primitive variables in
+# general-relativistic magnetohydrodynamics of Siegel et al.
 def generate_labels(rho, epsilon, vx, vy, vz):
-    # Converting the numpy arrays to torch tensors and moving them to the device
-    # rho = torch.tensor(rho, dtype=torch.float32).to(device)
-    # epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
-
     # Converting the numpy arrays to torch tensors and moving them to the device
     rho = torch.tensor(np.array(rho), dtype=torch.float32).to(device)
     epsilon = torch.tensor(np.array(epsilon), dtype=torch.float32).to(device)
@@ -501,7 +322,7 @@ def generate_labels(rho, epsilon, vx, vy, vz):
 
 # ### Generating or loading input data and labels
 
-# In[148]:
+# In[ ]:
 
 
 if LOAD_DATA_FROM_CSV:
@@ -518,11 +339,11 @@ if LOAD_DATA_FROM_CSV:
     y_test = torch.from_numpy(y_test).float().to(device)
 
     # This is an alternative to having if clauses  around the next cells that visualize these variables.
-    rho_train, epsilon_train, vx_train, vy_train, vz_train, Bx_train, By_train, Bz_train, gxx_train, gxy_train, gxz_train, gyy_train, gyz_train, gzz_train = None
-    rho_test, epsilon_test, vx_test, vy_test, vz_test, Bx_test, By_test, Bz_test, gxx_test, gxy_test, gxz_test, gyy_test, gyz_test, gzz_test = None
+    rho_train = epsilon_train = vx_train = vy_train = vz_train = Bx_train = By_train = Bz_train = gxx_train = gxy_train = gxz_train = gyy_train = gyz_train = gzz_train = None
+    rho_test = epsilon_test = vx_test = vy_test = vz_test = Bx_test = By_test = Bz_test = gxx_test = gxy_test = gxz_test = gyy_test = gyz_test = gzz_test = None
 
 
-# In[149]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -531,7 +352,7 @@ if not LOAD_DATA_FROM_CSV:
     rho_test, epsilon_test, vx_test, vy_test, vz_test, Bx_test, By_test, Bz_test, gxx_test, gxy_test, gxz_test, gyy_test, gyz_test, gzz_test = generate_samples(n_test_samples)
 
 
-# In[151]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -1737,8 +1558,8 @@ train_losses_loaded[-1]
 test_losses_loaded[-1]
 test_metrics_loaded[-1]['l1_norm']
 test_metrics_loaded[-1]['linf_norm']
-print(f'Error is {test_metrics_loaded[-1]["l1_norm"] / (3.84e-4)} times bigger than in Dieselhorst et al.')
-print(f'Error is {test_metrics_loaded[-1]["linf_norm"] / (8.14e-3)} times bigger than in Dieselhorst et al.')
+# print(f'Error is {test_metrics_loaded[-1]["l1_norm"] / (3.84e-4)} times bigger than in Dieselhorst et al.')
+# print(f'Error is {test_metrics_loaded[-1]["linf_norm"] / (8.14e-3)} times bigger than in Dieselhorst et al.')
 
 
 # ### Visualize loaded results
