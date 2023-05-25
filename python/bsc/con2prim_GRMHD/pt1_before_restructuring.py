@@ -55,7 +55,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[23]:
+# In[139]:
 
 
 import os
@@ -78,13 +78,13 @@ def save_file(file_name):
     pass
 
 
-# In[24]:
+# In[140]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
 
 
-# In[25]:
+# In[141]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX\n')
@@ -92,7 +92,7 @@ get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna t
 
 # Importing the **libraries**,
 
-# In[26]:
+# In[142]:
 
 
 import numpy as np
@@ -106,7 +106,7 @@ import tensorboardX as tbx
 import pandas as pd
 
 
-# In[27]:
+# In[143]:
 
 
 ##################################################     Debugging OPEN     ##################################################
@@ -116,7 +116,7 @@ import pandas as pd
 #         print(f"NaN values found in {name}")
 
 
-# In[28]:
+# In[144]:
 
 
 import numpy as np
@@ -139,7 +139,7 @@ def check_for_nan(local_vars):
 # 
 # **NOTE**: Some **subparameters** still need to be adjusted in the `create_model` function itself as of (Tue May 16 07:42:45 AM CEST 2023) in the case the model is being trained without optimization.
 
-# In[29]:
+# In[145]:
 
 
 # Checking if GPU is available and setting the device accordingly
@@ -215,13 +215,13 @@ np.random.seed(46) # Comment for true random data.
 # 
 # We either generate the data or load the data. First the definitions for generating the data come below.
 
-# In[30]:
+# In[146]:
 
 
 np.logspace(*np.log10(epsilon_interval), num=1)[0]
 
 
-# In[31]:
+# In[147]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -478,7 +478,7 @@ def generate_input_data(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy
 
 
 # Defining a function that generates output data (labels) from given samples of primitive variables
-def generate_labels(rho, epsilon):
+def generate_labels(rho, epsilon, vx, vy, vz):
     # Converting the numpy arrays to torch tensors and moving them to the device
     # rho = torch.tensor(rho, dtype=torch.float32).to(device)
     # epsilon = torch.tensor(epsilon, dtype=torch.float32).to(device)
@@ -486,17 +486,22 @@ def generate_labels(rho, epsilon):
     # Converting the numpy arrays to torch tensors and moving them to the device
     rho = torch.tensor(np.array(rho), dtype=torch.float32).to(device)
     epsilon = torch.tensor(np.array(epsilon), dtype=torch.float32).to(device)
-   
-    # Computing the pressure from the primitive variables using the EOS
-    p = eos_analytic(rho, epsilon)
+    vx = torch.tensor(np.array(vx), dtype=torch.float32).to(device)
+    vy = torch.tensor(np.array(vy), dtype=torch.float32).to(device)
+    vz = torch.tensor(np.array(vz), dtype=torch.float32).to(device)
+
+    # Computing the required quantities
+    pres = eos_analytic(rho, epsilon)
+    h = 1 + epsilon + pres / rho
+    W = 1 / torch.sqrt(1 - (vx * vx + vy * vy + vz * vz))
 
     # Returning the output data tensor
-    return p
+    return h * W
 
 
 # ### Generating or loading input data and labels
 
-# In[32]:
+# In[148]:
 
 
 if LOAD_DATA_FROM_CSV:
@@ -513,11 +518,11 @@ if LOAD_DATA_FROM_CSV:
     y_test = torch.from_numpy(y_test).float().to(device)
 
     # This is an alternative to having if clauses  around the next cells that visualize these variables.
-    rho_train = epsilon_train = vx_train = vy_train = vz_train = Bx_train = By_train = Bz_train = None
-    rho_test = epsilon_test = vx_test = vy_test = vz_test = Bx_test = By_test = Bz_test = None
+    rho_train, epsilon_train, vx_train, vy_train, vz_train, Bx_train, By_train, Bz_train, gxx_train, gxy_train, gxz_train, gyy_train, gyz_train, gzz_train = None
+    rho_test, epsilon_test, vx_test, vy_test, vz_test, Bx_test, By_test, Bz_test, gxx_test, gxy_test, gxz_test, gyy_test, gyz_test, gzz_test = None
 
 
-# In[33]:
+# In[149]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -526,7 +531,7 @@ if not LOAD_DATA_FROM_CSV:
     rho_test, epsilon_test, vx_test, vy_test, vz_test, Bx_test, By_test, Bz_test, gxx_test, gxy_test, gxz_test, gyy_test, gyz_test, gzz_test = generate_samples(n_test_samples)
 
 
-# In[34]:
+# In[151]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -535,14 +540,14 @@ if not LOAD_DATA_FROM_CSV:
                                 vz_train, Bx_train, By_train, Bz_train,
                                 gxx_train,gxy_train,gxz_train,
                                 gyy_train,gyz_train,gzz_train)
-    y_train = generate_labels(rho_train, epsilon_train)
+    y_train = generate_labels(rho_train, epsilon_train, vx_train, vy_train, vz_train)
     x_test = generate_input_data(rho_test, epsilon_test,vx_test,
                                 vy_test,vz_test,Bx_test,
                                 By_test,Bz_test,gxx_test,
                                 gxy_test,gxz_test,
                                 gyy_test,
                                 gyz_test,gzz_test)
-    y_test = generate_labels(rho_test, epsilon_test)
+    y_test = generate_labels(rho_test, epsilon_test, vx_test, vy_test, vz_test)
 
 
     # Save the data to CSV files, tensors need to be converted numpy arrays for saving in CSV.
@@ -552,7 +557,7 @@ if not LOAD_DATA_FROM_CSV:
     pd.DataFrame(y_test.cpu().numpy()).to_csv(csv_filenames["y_test"], index=False)
 
 
-# In[35]:
+# In[ ]:
 
 
 x_train.shape
@@ -565,7 +570,7 @@ x_test
 y_test
 
 
-# In[36]:
+# In[ ]:
 
 
 torch.isnan(x_train).any()
@@ -574,7 +579,7 @@ torch.isnan(y_train).any()
 torch.isnan(y_test).any()
 
 
-# In[37]:
+# In[ ]:
 
 
 nan_mask_train = torch.isnan(x_train)     # get a boolean mask indicating NaN values
@@ -592,7 +597,7 @@ len(nan_indices_test)
 
 # ### Visualizing sampled data
 
-# In[38]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -614,13 +619,13 @@ if not LOAD_DATA_FROM_CSV:
     Bz_test
 
 
-# In[39]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[40]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -658,13 +663,13 @@ if not LOAD_DATA_FROM_CSV:
     plt.show()
 
 
-# In[41]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[42]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -685,7 +690,7 @@ if not LOAD_DATA_FROM_CSV:
 
 # ### Data normalization
 
-# In[43]:
+# In[ ]:
 
 
 # Computing summary statistics of the input variables before and after z-score normalization
@@ -695,13 +700,13 @@ print(torch.stack([torch.min(x_train, dim=0).values, torch.max(x_train, dim=0).v
 
 # Perform z-score normalization
 
-# In[44]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
 
 
-# In[45]:
+# In[ ]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -748,13 +753,13 @@ if ZSCORE_NORMALIZATION:
 
 # Plotting the histograms of the input data after normalization if z-score normalization was performed.
 
-# In[46]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[47]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -774,7 +779,7 @@ if not LOAD_DATA_FROM_CSV:
         plt.show()
 
 
-# In[48]:
+# In[ ]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -785,7 +790,7 @@ if ZSCORE_NORMALIZATION:
 
 # ### Visualizing input data and labels
 
-# In[49]:
+# In[ ]:
 
 
 x_train
@@ -796,7 +801,7 @@ y_test
 
 # Checking if our output is always positive by plotting a histogram of y_train and y_test tensors 
 
-# In[50]:
+# In[ ]:
 
 
 # Note how we are only plotting train.
@@ -815,7 +820,7 @@ plt.tight_layout()
 plt.show()
 
 
-# In[51]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -823,7 +828,7 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 # ## Defining the neural network
 
-# In[52]:
+# In[ ]:
 
 
 # Defining a class for the network
@@ -878,7 +883,7 @@ class Net(nn.Module):
         """
         # Adding an assertion to check that the input tensor has the expected shape and type
         assert isinstance(x, torch.Tensor), "x must be a torch.Tensor"
-        assert x.shape[1] == N_INPUTS, f"x must have shape (batch_size, {N_I})"
+        assert x.shape[1] == N_INPUTS, f"x must have shape (batch_size, {N_INPUTS})"
 
         # Looping over the hidden layers and applying the linear transformation and the activation function
         for layer in self.layers[:-1]:
@@ -892,7 +897,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[53]:
+# In[ ]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -1110,7 +1115,7 @@ def create_model(trial, optimize):
 # 
 #  We first define a couple of functions used in the training and evaluation.
 
-# In[54]:
+# In[ ]:
 
 
 # Defining a function that computes loss and metrics for a given batch
@@ -1170,7 +1175,7 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[55]:
+# In[ ]:
 
 
 # Defining a function to train and evaluate a network
@@ -1338,7 +1343,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
 # ## The objective function and hyperparameter tuning
 
-# In[56]:
+# In[ ]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -1376,7 +1381,7 @@ def objective(trial):
     return test_metrics[-1]["l1_norm"]
 
 
-# In[57]:
+# In[ ]:
 
 
 if OPTIMIZE:
@@ -1397,7 +1402,7 @@ if OPTIMIZE:
 
 # ## Training the model
 
-# In[58]:
+# In[ ]:
 
 
 # Creating the best network and optimizer using the best hyperparameters
@@ -1434,7 +1439,7 @@ else:
     lr = create_model(trial=None, optimize=False)
 
 
-# In[59]:
+# In[ ]:
 
 
 print("loss_fn:", loss_fn)
@@ -1450,7 +1455,7 @@ print("hidden_activation:", hidden_activation)
 print("output_activation:", output_activation)
 
 
-# In[60]:
+# In[ ]:
 
 
 # Training and evaluating the network using the train_and_eval function
@@ -1461,7 +1466,7 @@ train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
 
 # ## Saving
 
-# In[61]:
+# In[ ]:
 
 
 import json
@@ -1515,7 +1520,7 @@ save_file("train_output.csv")
 
 # ## Visualizing the results
 
-# In[62]:
+# In[ ]:
 
 
 # Plotting the losses and metrics for the best network 
@@ -1567,7 +1572,7 @@ plt.show()
 
 # ## Loading
 
-# In[63]:
+# In[ ]:
 
 
 import json
@@ -1719,13 +1724,13 @@ test_metrics_loaded = [
 ]
 
 
-# In[64]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\nbatch_size_loaded\nn_epochs_loaded\nloss_name_loaded\noptimizer_name_loaded\nscheduler_name_loaded\nn_units_loaded\nn_layers_loaded\nhidden_activation_name_loaded\noutput_activation_name_loaded\nlr_loaded\nhidden_activation_loaded\noutput_activation_loaded\nnet_loaded\nnet_loaded.__dict__ # print the subparameters of the network\nloss_fn_loaded\noptimizer_loaded\noptimizer_loaded.__dict__ # print the subparameters of the optimizer\nscheduler_loaded\nscheduler_loaded.__dict__ # print the subparameters of the scheduler\ntrain_losses_loaded\ntest_losses_loaded\ntrain_metrics_loaded\ntest_metrics_loaded\n')
 
 
-# In[65]:
+# In[ ]:
 
 
 train_losses_loaded[-1]
@@ -1740,13 +1745,13 @@ print(f'Error is {test_metrics_loaded[-1]["linf_norm"] / (8.14e-3)} times bigger
 
 # Let us verify correct loading of the train and test metrics by visualizing them again but now through the loaded values. Likewise for the train and test losses.
 
-# In[66]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[67]:
+# In[ ]:
 
 
 # Plotting the losses and metrics for the best network plt.figure(figsize=(12, 
@@ -1795,7 +1800,7 @@ plt.legend()
 plt.show()
 
 
-# In[68]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -1803,7 +1808,7 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 # ## Counting the number of parameters in the network.
 
-# In[69]:
+# In[ ]:
 
 
 net_loaded.eval()
@@ -1817,7 +1822,7 @@ print(f'The model has {count_parameters(net_loaded)} parameters.')
 # 
 # We compare `net` and `net_loaded` to confirm correct loading of the network. Note that `net` is only available if we have trained the model in this session.
 
-# In[70]:
+# In[ ]:
 
 
 #%%script echo skipping
@@ -1826,14 +1831,14 @@ print(f'The model has {count_parameters(net_loaded)} parameters.')
 net.eval()
 
 
-# In[71]:
+# In[ ]:
 
 
 # Set the network to evaluation mode
 net_loaded.eval()
 
 
-# In[72]:
+# In[ ]:
 
 
 for p1, p2 in zip(net.parameters(), net_loaded.parameters()):
@@ -1847,7 +1852,7 @@ print("Net device:", next(net.parameters()).device)
 print("Net_loaded device:", next(net_loaded.parameters()).device)
 
 
-# In[73]:
+# In[ ]:
 
 
 #%%script echo skipping
@@ -1855,13 +1860,13 @@ print("Net_loaded device:", next(net_loaded.parameters()).device)
 print(list(net.parameters()))
 
 
-# In[74]:
+# In[ ]:
 
 
 print(list(net_loaded.parameters()))
 
 
-# In[76]:
+# In[ ]:
 
 
 rho_example, epsilon_example, vx_example, vy_example, vz_example, Bx_example, By_example, Bz_example, gxx_example, gxy_example, gxz_example, gyy_example, gyz_example, gzz_example = generate_samples(20)
@@ -1870,7 +1875,7 @@ inputs =  generate_input_data(rho_example, epsilon_example, vx_example, vy_examp
 inputs
 
 
-# In[78]:
+# In[ ]:
 
 
 #%%script echo skipping
@@ -1881,7 +1886,7 @@ outputs = [net(input.unsqueeze(0)) for input in inputs]
 outputs
 
 
-# In[79]:
+# In[ ]:
 
 
 # Pass the inputs to the network and get the outputs
@@ -1892,7 +1897,7 @@ outputs
 
 # ## Porting the model to C++
 
-# In[80]:
+# In[ ]:
 
 
 import torch.jit
