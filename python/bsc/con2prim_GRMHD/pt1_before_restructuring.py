@@ -55,7 +55,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[ ]:
+# In[2]:
 
 
 import os
@@ -78,13 +78,13 @@ def save_file(file_name):
     pass
 
 
-# In[ ]:
+# In[3]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
 
 
-# In[ ]:
+# In[4]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX\n')
@@ -92,7 +92,7 @@ get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna t
 
 # Importing the **libraries**,
 
-# In[ ]:
+# In[5]:
 
 
 import numpy as np
@@ -111,7 +111,7 @@ import pandas as pd
 # 
 # **NOTE**: Some **subparameters** still need to be adjusted in the `create_model` function itself as of (Tue May 16 07:42:45 AM CEST 2023) in the case the model is being trained without optimization.
 
-# In[ ]:
+# In[6]:
 
 
 # Checking if GPU is available and setting the device accordingly
@@ -120,7 +120,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 N_TRIALS = 250 # Number of trials for hyperparameter optimization
 OPTIMIZE = False # Whether to optimize the hyperparameters or to use predetermined values from Dieseldorst et al..
 ZSCORE_NORMALIZATION = False # Whether to z-score normalize the input data.
-LOAD_DATA_FROM_CSV = True  # If not true we generate the data in this file and save to {x_train,y_train,x_test,y_test}.csv, otherwise we load the data from files of the same name.
+LOAD_DATA_FROM_CSV = False  # If not true we generate the data in this file and save to {x_train,y_train,x_test,y_test}.csv, otherwise we load the data from files of the same name.
 
 csv_filenames = { # File names to load input data and labels from if LOAD_DATA_FROM_CSV is True.
     "x_train": "x_train.csv",
@@ -138,21 +138,23 @@ LOSS_NAME_NO_OPT = "Huber"
 OPTIMIZER_NAME_NO_OPT = "RMSprop"
 LR_NO_OPT = 0.000122770896701404
 BATCH_SIZE_NO_OPT = 49
-N_EPOCHS_NO_OPT = 10
+N_EPOCHS_NO_OPT = 3
 SCHEDULER_NAME_NO_OPT = "ReduceLROnPlateau"
 
-Gamma = 5 / 3  # Adiabatic index
+N_INPUTS = 14  # Number of input features.
+Gamma = 5/3  # Adiabatic index
+
 n_train_samples = 80000 # Number of training samples
 n_test_samples = 20000 # Number of test samples
-rho_interval = (0, 2) # sample in linear space
-epsilon_interval = (1e-9, 1500)  # sample in log space
-# Invalid values for the velocities will be masked in sample_primitive_variables.
-vx_interval = (0, 0.999)  # sample in linear space
-vy_interval = (0, 0.999)  # sample in linear space
-vz_interval = (0, 0.999)  # sample in linear space
-Bx_interval = (-10, 10)  # sample in linear space
-By_interval = (-10, 10)  # sample in linear space
-Bz_interval = (-10, 10)  # sample in linear space
+
+rho_interval = (0, 2) 
+epsilon_interval = (1e-2, 2000)  # Will be sampled in log space
+vx_interval = (0, 0.999)  
+vy_interval = (0, 0.999)  
+vz_interval = (0, 0.999)  
+Bx_interval = (-10, 10)  
+By_interval = (-10, 10)  
+Bz_interval = (-10, 10)  
 gxx_interval = (0.9, 1.1)
 gxy_interval = (0, 0.1)
 gxz_interval = (0, 0.1)
@@ -160,17 +162,14 @@ gyy_interval = (0.9, 1.1)
 gyz_interval = (0, 0.1)
 gzz_interval = (0.9, 1.1)
 
-
-N_INPUTS = 14  # Number of input features.
-
-np.random.seed(46) # Comment for true random data.
+np.random.seed(50) # Comment for true random data.
 
 
 # ## Input data and labels
 # 
 # We either generate the data or load the data. First the definitions for generating the data come below.
 
-# In[ ]:
+# In[7]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -189,10 +188,9 @@ def eos_analytic(rho, epsilon):
 
 
 
-def sample_primitive_variables():
+def sample_primitive_variables_and_metric():
     rho = np.random.uniform(*rho_interval)  
-    # epsilon = np.logspace(*np.log10(epsilon_interval))  
-    epsilon = np.random.choice(np.logspace(*np.log10(epsilon_interval)))
+    epsilon = 10 ** np.random.uniform(*np.log10(epsilon_interval))
     vx = np.random.uniform(*vx_interval)  
     vy = np.random.uniform(*vy_interval)  
     vz = np.random.uniform(*vz_interval)  
@@ -221,7 +219,7 @@ def check_sample(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy, gyz, 
 def generate_samples(n_samples):
     samples = []
     while len(samples) < n_samples:
-        sample = sample_primitive_variables()
+        sample = sample_primitive_variables_and_metric()
         if check_sample(*sample):
             samples.append(sample)
         print(f"Number of valid samples: {len(samples)}")
@@ -232,7 +230,9 @@ def sdet(gxx, gxy, gxz, gyy, gyz, gzz):
     # Determinant of the three metric.
     return (gxx * gyy * gzz + 2 * gxy * gxz * gyz - gxx * gyz ** 2 - gyy * gxz ** 2 - gzz * gxy ** 2) ** 0.5
 
-# Defining a function that computes conserved variables from primitive variables
+# Defining a function that computes conserved variables from primitive variables and the metric
+# We follow the source code of GRaM-X: A new GPU-accelerated dynamical spacetime GRMHD code for Exascale
+# computing with the Einstein Toolkit of Shankar et al.
 def compute_conserved_variables(rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy, gyz, gzz):
     pres = eos_analytic(rho, epsilon)
     wtemp = 1 / (1 - (gxx * vx**2 + gyy * vy**2 + gzz * vz**2 +
@@ -322,7 +322,7 @@ def generate_labels(rho, epsilon, vx, vy, vz):
 
 # ### Generating or loading input data and labels
 
-# In[ ]:
+# In[8]:
 
 
 if LOAD_DATA_FROM_CSV:
@@ -338,21 +338,21 @@ if LOAD_DATA_FROM_CSV:
     x_test = torch.from_numpy(x_test).float().to(device)
     y_test = torch.from_numpy(y_test).float().to(device)
 
-    # This is an alternative to having if clauses  around the next cells that visualize these variables.
+    # This is an alternative to having if clauses  around the cells that visualize these variables.
     rho_train = epsilon_train = vx_train = vy_train = vz_train = Bx_train = By_train = Bz_train = gxx_train = gxy_train = gxz_train = gyy_train = gyz_train = gzz_train = None
     rho_test = epsilon_test = vx_test = vy_test = vz_test = Bx_test = By_test = Bz_test = gxx_test = gxy_test = gxz_test = gyy_test = gyz_test = gzz_test = None
 
 
-# In[ ]:
+# In[9]:
 
 
 if not LOAD_DATA_FROM_CSV:
-    # Sample primitive variables
+    # Sample primitive variables and metric
     rho_train, epsilon_train, vx_train, vy_train, vz_train, Bx_train, By_train, Bz_train, gxx_train, gxy_train, gxz_train, gyy_train, gyz_train, gzz_train = generate_samples(n_train_samples)
     rho_test, epsilon_test, vx_test, vy_test, vz_test, Bx_test, By_test, Bz_test, gxx_test, gxy_test, gxz_test, gyy_test, gyz_test, gzz_test = generate_samples(n_test_samples)
 
 
-# In[ ]:
+# In[10]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -373,12 +373,16 @@ if not LOAD_DATA_FROM_CSV:
 
     # Save the data to CSV files, tensors need to be converted numpy arrays for saving in CSV.
     pd.DataFrame(x_train.cpu().numpy()).to_csv(csv_filenames["x_train"], index=False)
+    save_file(csv_filenames["x_train"])
     pd.DataFrame(y_train.cpu().numpy()).to_csv(csv_filenames["y_train"], index=False)
+    save_file(csv_filenames["y_train"])
     pd.DataFrame(x_test.cpu().numpy()).to_csv(csv_filenames["x_test"], index=False)
+    save_file(csv_filenames["x_test"])
     pd.DataFrame(y_test.cpu().numpy()).to_csv(csv_filenames["y_test"], index=False)
+    save_file(csv_filenames["y_test"])
 
 
-# In[ ]:
+# In[11]:
 
 
 x_train.shape
@@ -391,7 +395,7 @@ x_test
 y_test
 
 
-# In[ ]:
+# In[12]:
 
 
 torch.isnan(x_train).any()
@@ -400,97 +404,106 @@ torch.isnan(y_train).any()
 torch.isnan(y_test).any()
 
 
-# In[ ]:
+# In[13]:
 
 
 nan_mask_train = torch.isnan(x_train)     # get a boolean mask indicating NaN values
 nan_indices_train = torch.where(nan_mask_train)  # get the indices of the NaN values
 nan_indices_train
-len(nan_indices_train)
+# len(nan_indices_train)
 
 nan_mask_test = torch.isnan(x_test)     # get a boolean mask indicating NaN values
 nan_indices_test = torch.where(nan_mask_train)  # get the indices of the NaN values
 nan_indices_test
-len(nan_indices_test)
+# len(nan_indices_test)
 
 
 # ## Visualizing the data
 
 # ### Visualizing sampled data
 
-# In[ ]:
+# In[14]:
 
 
-if not LOAD_DATA_FROM_CSV:
-    rho_train
-    epsilon_train
-    vx_train
-    vy_train
-    vz_train 
-    Bx_train
-    By_train
-    Bz_train
-    rho_test
-    epsilon_test
-    vx_test 
-    vy_test 
-    vz_test 
-    Bx_test
-    By_test
-    Bz_test
+get_ipython().run_cell_magic('script', 'echo skipping', '\nif not LOAD_DATA_FROM_CSV:\n    rho_train\n    epsilon_train\n    vx_train\n    vy_train\n    vz_train \n    Bx_train\n    By_train\n    Bz_train\n    rho_test\n    epsilon_test\n    vx_test \n    vy_test \n    vz_test \n    Bx_test\n    By_test\n    Bz_test\n')
 
 
-# In[ ]:
+# In[37]:
+
+
+print(len(rho_train))
+print(len(epsilon_train))
+print(len(vx_train))
+print(len(vy_train))
+print(len(vz_train))
+print(len(Bx_train))
+print(len(By_train))
+print(len(Bz_train))
+print()
+print(len(rho_test))
+print(len(epsilon_test))
+print(len(vx_test))
+print(len(vy_test))
+print(len(vz_test))
+print(len(Bx_test))
+print(len(By_test))
+print(len(Bz_test))
+
+
+# In[15]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[ ]:
+# In[46]:
 
 
 if not LOAD_DATA_FROM_CSV:
-    def plot_histogram(data, xlabel, ylabel, position, bins=20, log_scale=False):
+    def plot_histogram(data, xlabel, ylabel, position, bins=20, xlog_scale=False, ylog_scale=False):
         plt.subplot(4, 5, position)
         plt.hist(data, bins=bins)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
-        if log_scale:
+        if xlog_scale:
+            plt.xscale("log")
+        if ylog_scale:
             plt.yscale("log")
 
     # Plotting the histograms of rho, vx, epsilon, b0, b1, b2, and b3
+    bins = 30
     plt.figure(figsize=(20, 16))
 
-    plot_histogram(rho_train, "rho", "Frequency", 1)
-    plot_histogram(epsilon_train, "epsilon", "Frequency", 2)
-    plot_histogram(vx_train, "vx", "Frequency", 3)
-    plot_histogram(vy_train, "vy", "Frequency", 4)
-    plot_histogram(vz_train, "vz", "Frequency", 5)
-    plot_histogram(Bx_train, "Bx", "Frequency", 6)
-    plot_histogram(By_train, "By", "Frequency", 7)
-    plot_histogram(Bz_train, "Bz", "Frequency", 8)
-    
-    # Plot these
-    plot_histogram(gxx_train, "gxx", "Frequency", 9)
-    plot_histogram(gxy_train, "gxy", "Frequency", 10)
-    plot_histogram(gxz_train, "gxz", "Frequency", 11)
-    plot_histogram(gyy_train, "gyy", "Frequency", 12)
-    plot_histogram(gyz_train, "gyz", "Frequency", 13)
-    plot_histogram(gzz_train, "gzz", "Frequency", 14)
-    # Adjust the layout as needed for the additional plots
+    plot_histogram(rho_train, "rho", "Frequency", 1, bins=bins)
+    plot_histogram(epsilon_train, "epsilon", "Frequency", 2, xlog_scale=True, bins=bins)
+    plot_histogram(vx_train, "vx", "Frequency", 3, bins=bins)
+    plot_histogram(vy_train, "vy", "Frequency", 4, bins=bins)
+    plot_histogram(vz_train, "vz", "Frequency", 5, bins=bins)
+    plot_histogram(Bx_train, "Bx", "Frequency", 6, bins=bins)
+    plot_histogram(By_train, "By", "Frequency", 7, bins=bins)
+    plot_histogram(Bz_train, "Bz", "Frequency", 8, bins=bins)
 
-    plt.suptitle("Primitive variables")
+    # Plot these
+    plot_histogram(gxx_train, "gxx", "Frequency", 9, bins=bins)
+    plot_histogram(gxy_train, "gxy", "Frequency", 10, bins=bins)
+    plot_histogram(gxz_train, "gxz", "Frequency", 11, bins=bins)
+    plot_histogram(gyy_train, "gyy", "Frequency", 12, bins=bins)
+    plot_histogram(gyz_train, "gyz", "Frequency", 13, bins=bins)
+    plot_histogram(gzz_train, "gzz", "Frequency", 14, bins=bins)
+
+
+    plt.suptitle("Primitive variables and metric")
     plt.tight_layout()
     plt.show()
 
 
-# In[ ]:
+# In[17]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[ ]:
+# In[18]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -511,7 +524,7 @@ if not LOAD_DATA_FROM_CSV:
 
 # ### Data normalization
 
-# In[ ]:
+# In[19]:
 
 
 # Computing summary statistics of the input variables before and after z-score normalization
@@ -521,13 +534,13 @@ print(torch.stack([torch.min(x_train, dim=0).values, torch.max(x_train, dim=0).v
 
 # Perform z-score normalization
 
-# In[ ]:
+# In[20]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
 
 
-# In[ ]:
+# In[21]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -574,13 +587,13 @@ if ZSCORE_NORMALIZATION:
 
 # Plotting the histograms of the input data after normalization if z-score normalization was performed.
 
-# In[ ]:
+# In[22]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[ ]:
+# In[23]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -600,7 +613,7 @@ if not LOAD_DATA_FROM_CSV:
         plt.show()
 
 
-# In[ ]:
+# In[24]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -611,7 +624,7 @@ if ZSCORE_NORMALIZATION:
 
 # ### Visualizing input data and labels
 
-# In[ ]:
+# In[25]:
 
 
 x_train
@@ -620,28 +633,60 @@ x_test
 y_test
 
 
-# Checking if our output is always positive by plotting a histogram of y_train and y_test tensors 
+# Checking if our output is always positive ~~by plotting a histogram of y_train and y_test tensors~~
 
-# In[ ]:
+# In[26]:
 
 
-# Note how we are only plotting train.
+import torch
+
+# Create a sample tensor
+tensor = torch.randn(80000, 14)  # Assuming a tensor of shape [80000, 14]
+tensor
+
+
+# Check if any element is negative
+any_negative = torch.any(tensor < 0)
+
+# Print the result
+print(any_negative)
+
+
+# In[27]:
+
+
+y_train.shape
+any_negative = torch.any(y_train < 0)
+any_negative
+
+y_test.shape
+any_negative = torch.any(y_test < 0)
+any_negative
+
+x_train.shape
+any_negative = torch.any(x_train < 0)
+any_negative
+
+
+# In[28]:
+
+
 plt.figure(figsize=(8, 4))
 plt.subplot(1, 2, 1)
 plt.hist(y_train.cpu().numpy(), bins=20) # must be cpu here.
 plt.xlabel("y_train")
 plt.ylabel("Frequency")
-plt.yscale("log")
+plt.xscale("log")
 plt.subplot(1, 2, 2)
 plt.hist(y_test.cpu().numpy(), bins=20) # must be cpu here
 plt.xlabel("y_test")
 plt.ylabel("Frequency")
-plt.yscale("log")
+plt.xscale("log")
 plt.tight_layout()
 plt.show()
 
 
-# In[ ]:
+# In[29]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -649,7 +694,7 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 # ## Defining the neural network
 
-# In[ ]:
+# In[117]:
 
 
 # Defining a class for the network
@@ -718,7 +763,7 @@ class Net(nn.Module):
 
 # ## Defining the model and search space
 
-# In[ ]:
+# In[118]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -936,7 +981,7 @@ def create_model(trial, optimize):
 # 
 #  We first define a couple of functions used in the training and evaluation.
 
-# In[ ]:
+# In[119]:
 
 
 # Defining a function that computes loss and metrics for a given batch
@@ -996,7 +1041,7 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[ ]:
+# In[120]:
 
 
 # Defining a function to train and evaluate a network
@@ -1164,7 +1209,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tri
 
 # ## The objective function and hyperparameter tuning
 
-# In[ ]:
+# In[121]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -1202,7 +1247,7 @@ def objective(trial):
     return test_metrics[-1]["l1_norm"]
 
 
-# In[ ]:
+# In[122]:
 
 
 if OPTIMIZE:
@@ -1223,7 +1268,7 @@ if OPTIMIZE:
 
 # ## Training the model
 
-# In[ ]:
+# In[123]:
 
 
 # Creating the best network and optimizer using the best hyperparameters
@@ -1260,7 +1305,7 @@ else:
     lr = create_model(trial=None, optimize=False)
 
 
-# In[ ]:
+# In[124]:
 
 
 print("loss_fn:", loss_fn)
@@ -1276,7 +1321,7 @@ print("hidden_activation:", hidden_activation)
 print("output_activation:", output_activation)
 
 
-# In[ ]:
+# In[125]:
 
 
 # Training and evaluating the network using the train_and_eval function
@@ -1287,7 +1332,7 @@ train_losses, test_losses, train_metrics, test_metrics = train_and_eval(
 
 # ## Saving
 
-# In[ ]:
+# In[126]:
 
 
 import json
@@ -1341,7 +1386,7 @@ save_file("train_output.csv")
 
 # ## Visualizing the results
 
-# In[ ]:
+# In[127]:
 
 
 # Plotting the losses and metrics for the best network 
@@ -1393,7 +1438,7 @@ plt.show()
 
 # ## Loading
 
-# In[ ]:
+# In[128]:
 
 
 import json
@@ -1545,13 +1590,13 @@ test_metrics_loaded = [
 ]
 
 
-# In[ ]:
+# In[129]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\nbatch_size_loaded\nn_epochs_loaded\nloss_name_loaded\noptimizer_name_loaded\nscheduler_name_loaded\nn_units_loaded\nn_layers_loaded\nhidden_activation_name_loaded\noutput_activation_name_loaded\nlr_loaded\nhidden_activation_loaded\noutput_activation_loaded\nnet_loaded\nnet_loaded.__dict__ # print the subparameters of the network\nloss_fn_loaded\noptimizer_loaded\noptimizer_loaded.__dict__ # print the subparameters of the optimizer\nscheduler_loaded\nscheduler_loaded.__dict__ # print the subparameters of the scheduler\ntrain_losses_loaded\ntest_losses_loaded\ntrain_metrics_loaded\ntest_metrics_loaded\n')
 
 
-# In[ ]:
+# In[130]:
 
 
 train_losses_loaded[-1]
@@ -1566,13 +1611,13 @@ test_metrics_loaded[-1]['linf_norm']
 
 # Let us verify correct loading of the train and test metrics by visualizing them again but now through the loaded values. Likewise for the train and test losses.
 
-# In[ ]:
+# In[131]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[ ]:
+# In[132]:
 
 
 # Plotting the losses and metrics for the best network plt.figure(figsize=(12, 
@@ -1621,7 +1666,7 @@ plt.legend()
 plt.show()
 
 
-# In[ ]:
+# In[133]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -1629,7 +1674,7 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 # ## Counting the number of parameters in the network.
 
-# In[ ]:
+# In[134]:
 
 
 net_loaded.eval()
@@ -1643,7 +1688,7 @@ print(f'The model has {count_parameters(net_loaded)} parameters.')
 # 
 # We compare `net` and `net_loaded` to confirm correct loading of the network. Note that `net` is only available if we have trained the model in this session.
 
-# In[ ]:
+# In[135]:
 
 
 #%%script echo skipping
@@ -1652,14 +1697,14 @@ print(f'The model has {count_parameters(net_loaded)} parameters.')
 net.eval()
 
 
-# In[ ]:
+# In[136]:
 
 
 # Set the network to evaluation mode
 net_loaded.eval()
 
 
-# In[ ]:
+# In[137]:
 
 
 for p1, p2 in zip(net.parameters(), net_loaded.parameters()):
@@ -1673,7 +1718,7 @@ print("Net device:", next(net.parameters()).device)
 print("Net_loaded device:", next(net_loaded.parameters()).device)
 
 
-# In[ ]:
+# In[138]:
 
 
 #%%script echo skipping
@@ -1681,13 +1726,13 @@ print("Net_loaded device:", next(net_loaded.parameters()).device)
 print(list(net.parameters()))
 
 
-# In[ ]:
+# In[139]:
 
 
 print(list(net_loaded.parameters()))
 
 
-# In[ ]:
+# In[140]:
 
 
 rho_example, epsilon_example, vx_example, vy_example, vz_example, Bx_example, By_example, Bz_example, gxx_example, gxy_example, gxz_example, gyy_example, gyz_example, gzz_example = generate_samples(20)
@@ -1696,7 +1741,7 @@ inputs =  generate_input_data(rho_example, epsilon_example, vx_example, vy_examp
 inputs
 
 
-# In[ ]:
+# In[141]:
 
 
 #%%script echo skipping
@@ -1707,7 +1752,7 @@ outputs = [net(input.unsqueeze(0)) for input in inputs]
 outputs
 
 
-# In[ ]:
+# In[142]:
 
 
 # Pass the inputs to the network and get the outputs
@@ -1718,7 +1763,7 @@ outputs
 
 # ## Porting the model to C++
 
-# In[ ]:
+# In[143]:
 
 
 import torch.jit
