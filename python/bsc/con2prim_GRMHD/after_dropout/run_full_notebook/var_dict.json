@@ -1,0 +1,1 @@
+{"batch_size": 2048, "n_epochs": 72, "loss_name": "Huber", "optimizer_name": "Adam", "scheduler_name": "StepLR", "n_units": [3634, 839, 662], "n_layers": 3, "hidden_activation_name": "LeakyReLU", "output_activation_name": "Identity", "lr": 0.40489220743650745, "dropout_rate": 0.18066885704717772, "leakyrelu_slope": 0.16917055975115308}
