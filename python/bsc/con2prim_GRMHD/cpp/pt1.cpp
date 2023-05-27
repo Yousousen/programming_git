@@ -5,6 +5,8 @@ int main() {
   // Set the path to the net.pt file.
   char path_to_model[] = "../../net.pt";
 
+  const int N_INPUTS = 14;
+
   // Declaring a variable to store the model
   torch::jit::script::Module model;
 
@@ -33,8 +35,12 @@ int main() {
 
 
   // Converting the input data from python to C++ using torch::from_blob function
-  float input_data[] = {7.7606, 3.8938, 5.0599, 4.8451, 9.1032, 0.2814, 0.7417, 0.5824};
-  auto input_tensor = torch::from_blob(input_data, {1, 8});
+  // To confirm corresponding output in python, copy over the values of
+  // example_input_to_validate_correct_export_and_import and paste it in here.
+  float input_data[] = {3.1717e+00,  6.0219e-01,  3.1827e+01,  5.5007e+01,  6.2227e+01,
+         -3.8689e+00,  3.3077e+00, -3.5445e+00,  9.3597e-01,  1.6982e-02,
+          9.7446e-02,  1.0166e+00,  8.6980e-02,  1.0277e+00};
+  auto input_tensor = torch::from_blob(input_data, {1, N_INPUTS});
 
   // Moving the input tensor to the same device as the model
   input_tensor = input_tensor.to(at::kCPU);
