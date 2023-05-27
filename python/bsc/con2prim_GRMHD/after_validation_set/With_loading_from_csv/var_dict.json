@@ -1,0 +1,1 @@
+{"batch_size": 128, "n_epochs": 127, "loss_name": "MSE", "optimizer_name": "RMSprop", "scheduler_name": "StepLR", "n_units": [2684, 3993], "n_layers": 2, "hidden_activation_name": "ELU", "output_activation_name": "Identity", "lr": 6.647180167794518e-06}
