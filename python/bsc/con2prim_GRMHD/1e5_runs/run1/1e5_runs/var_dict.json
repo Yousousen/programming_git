@@ -1,0 +1,1 @@
+{"batch_size": 1024, "n_epochs": 143, "loss_name": "MSE", "optimizer_name": "Adam", "scheduler_name": "ReduceLROnPlateau", "n_units": [3558, 165, 3906, 434, 239, 1274], "n_layers": 6, "hidden_activation_name": "PReLU", "output_activation_name": "Identity", "lr": 1.0435149104684462e-06, "dropout_rate": 0.06388872518840581, "prelu_init": 0.20173096656799316}
