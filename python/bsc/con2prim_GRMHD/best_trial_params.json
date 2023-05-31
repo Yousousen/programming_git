@@ -1,0 +1,1 @@
+{"batch_size": 512, "dropout_rate": 0.3660754173253749, "gamma": 0.38983483936388896, "hidden_activation": "GELU", "loss": "Huber", "lr": 0.00011250554346747867, "n_epochs": 93, "n_layers": 2, "n_units_0": 2202, "n_units_1": 1665, "optimizer": "Adagrad", "output_activation": "Linear", "scheduler": "StepLR", "step_size": 5}

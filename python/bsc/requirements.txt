@@ -8,6 +8,8 @@ pandas
 matplotlib
 torch
 optuna
+optuna[visualization]
+plotly
 tensorboard
 tensorboardX
 torch-tb-profiler
