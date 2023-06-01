@@ -1388,6 +1388,17 @@ def callback(study, trial):
         f.write('\n')
         save_file('all_trials.json')
 
+    # Saving the study to a pickle file
+    with open(f'{STUDY_NAME}.pkl', 'wb') as f:
+        pickle.dump(study, f)
+        save_file(f'{STUDY_NAME}.pkl')
+
+    # Save the best trial separately as well.
+    best_trial_params = study.best_trial.params
+    with open('best_trial_params.json', 'w') as f:
+        json.dump(best_trial_params, f)
+        save_file('best_trial_params.json')
+
     # Visualize the optimization history, and save it as an HTML file.
     fig1 = ov.plot_optimization_history(study)
     fig1.write_html(f"optimization_history_{STUDY_NAME}.html")
@@ -1399,9 +1410,10 @@ def callback(study, trial):
     fig2.write_html(f"slice_plot_{STUDY_NAME}.html")
     save_file(f"slice_plot_{STUDY_NAME}.html")
 
-    fig3 = ov.plot_contour(study)
-    fig3.write_html(f"contour_plot_{STUDY_NAME}.html")
-    save_file(f"contour_plot_{STUDY_NAME}.html")
+    # if trial.number % 10 == 0:
+    #     fig3 = ov.plot_contour(study)
+    #     fig3.write_html(f"contour_plot_{STUDY_NAME}.html")
+    #     save_file(f"contour_plot_{STUDY_NAME}.html")
 
     fig4 = ov.plot_parallel_coordinate(study)
     fig4.write_html(f"parallel_coordinate_plot_{STUDY_NAME}.html")
@@ -1430,21 +1442,21 @@ if OPTIMIZE:
 
 
 if OPTIMIZE:
-#    # Optimization History
-#    ov.plot_optimization_history(study).show()
-#
-#    # Slice Plot
-#    ov.plot_slice(study).show()
-#
-#    # Contour Plot
-#    ov.plot_contour(study).show()
-#
-#    # Parallel Coordinate Plot
-#    ov.plot_parallel_coordinate(study).show()
-#
-#    # Hyperparameter Importance Plot
-#    ov.plot_param_importances(study).show()
-#
+    # Optimization History
+    ov.plot_optimization_history(study).show()
+ 
+    # Slice Plot
+    ov.plot_slice(study).show()
+ 
+    # Contour Plot
+    ov.plot_contour(study).show()
+ 
+    # Parallel Coordinate Plot
+    ov.plot_parallel_coordinate(study).show()
+ 
+    # Hyperparameter Importance Plot
+    ov.plot_param_importances(study).show()
+
     # Best trial information
     print("Best trial:")
     trial = study.best_trial
