@@ -1399,26 +1399,28 @@ def callback(study, trial):
     fig2.write_html(f"slice_plot_{STUDY_NAME}.html")
     save_file(f"slice_plot_{STUDY_NAME}.html")
 
-    # fig3 = ov.plot_contour(study)
-    # fig3.write_html(f"contour_plot_{STUDY_NAME}.html")
-    # save_file(f"contour_plot_{STUDY_NAME}.html")
+    fig3 = ov.plot_contour(study)
+    fig3.write_html(f"contour_plot_{STUDY_NAME}.html")
+    save_file(f"contour_plot_{STUDY_NAME}.html")
 
-    # fig4 = ov.plot_parallel_coordinate(study)
-    # fig4.write_html(f"parallel_coordinate_plot_{STUDY_NAME}.html")
-    # save_file(f"parallel_coordinate_plot_{STUDY_NAME}.html")
+    fig4 = ov.plot_parallel_coordinate(study)
+    fig4.write_html(f"parallel_coordinate_plot_{STUDY_NAME}.html")
+    save_file(f"parallel_coordinate_plot_{STUDY_NAME}.html")
 
-    # if trial.number > 1: # Required
-    #   fig5 = ov.plot_param_importances(study)
-    #   fig5.write_html(f"param_importances_plot_{STUDY_NAME}.html")
-    #   save_file(f"param_importances_plot_{STUDY_NAME}.html")
+    if trial.number > 1: # Required
+      fig5 = ov.plot_param_importances(study)
+      fig5.write_html(f"param_importances_plot_{STUDY_NAME}.html")
+      save_file(f"param_importances_plot_{STUDY_NAME}.html")
 
         
 if OPTIMIZE:
+    # Gave an error in my run on arch bsc_physics_env. It doesn't matter anyway, since we use pickle for saving.
     # Include the path to the SQLite file in your create_study call.
-    study = optuna.create_study(direction="minimize", 
-                                sampler=optuna.samplers.TPESampler(), 
-                                pruner=optuna.pruners.MedianPruner(), 
-                                storage=f'sqlite:///{STUDY_NAME}.db')
+    # study = optuna.create_study(direction="minimize", 
+                                # sampler=optuna.samplers.TPESampler(), 
+                                # pruner=optuna.pruners.MedianPruner(), 
+                                # storage=f'sqlite:///{STUDY_NAME}.db')
+    study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(), pruner=optuna.pruners.MedianPruner())
 
     study.optimize(objective, n_trials=N_TRIALS, callbacks=[callback])
     #study.optimize(objective, n_trials=N_TRIALS)
