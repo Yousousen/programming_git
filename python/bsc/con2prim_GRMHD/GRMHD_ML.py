@@ -1449,7 +1449,7 @@ if OPTIMIZE:
     ov.plot_slice(study).show()
  
     # Contour Plot
-    ov.plot_contour(study).show()
+    # ov.plot_contour(study).show()
  
     # Parallel Coordinate Plot
     ov.plot_parallel_coordinate(study).show()
