@@ -55,7 +55,7 @@
 
 # Next some cells for working on **google colab**,
 
-# In[43]:
+# In[ ]:
 
 
 import os
@@ -78,13 +78,13 @@ def save_file(file_name):
     pass
 
 
-# In[44]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping # NOTE: Set this before properly.', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
 
 
-# In[45]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping # NOTE: Set this before properly.', '\n!pip install optuna optuna[visualization] tensorboard tensorboardX plotly\n')
@@ -92,7 +92,7 @@ get_ipython().run_cell_magic('script', 'echo skipping # NOTE: Set this before pr
 
 # Importing the **libraries**,
 
-# In[46]:
+# In[ ]:
 
 
 import numpy as np
@@ -115,13 +115,13 @@ import pandas as pd
 # 
 # **NOTE**: Some **subparameters** still need to be adjusted in the `create_model` function itself as of (Tue May 16 07:42:45 AM CEST 2023) in the case the model is being trained without optimization.
 
-# In[47]:
+# In[ ]:
 
 
 # Checking if GPU is available and setting the device accordingly
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-N_TRIALS = 2 # Number of trials for hyperparameter optimization # NOTE: Set this properly.
+N_TRIALS = 5 # Number of trials for hyperparameter optimization # NOTE: Set this properly.
 OPTIMIZE = True # Whether to optimize the hyperparameters or to use predetermined values. # NOTE: Set this properly.
 ZSCORE_NORMALIZATION = False # Whether to z-score normalize the input data.
 LOAD_DATA_FROM_CSV = False  # If not true we generate the data in this file and save to {x_train,y_train,x_test,y_test}.csv, otherwise we load the data from files of the same name. # NOTE: Set this before properly.
@@ -181,7 +181,7 @@ np.random.seed(70) # Comment for true random data.
 # 
 # We either generate the data or load the data. First the definitions for generating the data come below.
 
-# In[48]:
+# In[ ]:
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -326,13 +326,13 @@ def generate_labels(rho, epsilon, vx, vy, vz):
 
 # ### Generating or loading input data and labels
 
-# In[49]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
 
 
-# In[50]:
+# In[ ]:
 
 
 if LOAD_DATA_FROM_CSV:
@@ -356,7 +356,7 @@ if LOAD_DATA_FROM_CSV:
     rho = epsilon = vx = vy = vz = Bx = By = Bz = gxx = gxy = gxz = gyy = gyz  = gzz = None
 
 
-# In[51]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -364,7 +364,7 @@ if not LOAD_DATA_FROM_CSV:
     rho, epsilon, vx, vy, vz, Bx, By, Bz, gxx, gxy, gxz, gyy, gyz, gzz = generate_samples(n_samples)
 
 
-# In[52]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -401,7 +401,7 @@ if not LOAD_DATA_FROM_CSV:
     save_file(csv_filenames["y_test"])
 
 
-# In[53]:
+# In[ ]:
 
 
 x_train.shape
@@ -418,7 +418,7 @@ x_test
 y_test
 
 
-# In[54]:
+# In[ ]:
 
 
 torch.isnan(x_train).any()
@@ -429,7 +429,7 @@ torch.isnan(y_val).any()
 torch.isnan(y_test).any()
 
 
-# In[55]:
+# In[ ]:
 
 
 nan_mask_train = torch.isnan(x_train)     # get a boolean mask indicating NaN values
@@ -452,13 +452,13 @@ nan_indices_test
 
 # ### Visualizing sampled data
 
-# In[56]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\nif not LOAD_DATA_FROM_CSV:\n    rho\n    epsilon\n    vx\n    vy\n    vz \n    Bx\n    By\n    Bz\n    gxx\n    gxy\n    gxz\n    gyy\n    gyz\n    gzz \n')
 
 
-# In[57]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -479,19 +479,19 @@ if not LOAD_DATA_FROM_CSV:
     print(len(gzz))
 
 
-# In[58]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[59]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\nplt.hist([np.random.uniform(0, 0.999) for _ in range(n_train_samples)], bins=20)\n')
 
 
-# In[60]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\nepsilon\n')
@@ -499,7 +499,7 @@ get_ipython().run_cell_magic('script', 'echo skipping', '\nepsilon\n')
 
 # The reason the sampling is not uniformly distributed in the following plots is due to the resampling and the fact that we certain values of e.g. velocity are more likely to violate the speed of light constraint than others.
 
-# In[61]:
+# In[ ]:
 
 
 #%%script echo skipping
@@ -542,13 +542,13 @@ if not LOAD_DATA_FROM_CSV:
     plt.show()
 
 
-# In[62]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[63]:
+# In[ ]:
 
 
 #%%script echo skipping
@@ -594,7 +594,7 @@ plt.show()
 
 # ### Data normalization
 
-# In[64]:
+# In[ ]:
 
 
 # Computing summary statistics of the input variables before and after z-score normalization
@@ -604,13 +604,13 @@ print(torch.stack([torch.min(x_train, dim=0).values, torch.max(x_train, dim=0).v
 
 # Perform z-score normalization
 
-# In[65]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
 
 
-# In[66]:
+# In[ ]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -657,13 +657,13 @@ if ZSCORE_NORMALIZATION:
 
 # Plotting the histograms of the input data after normalization if z-score normalization was performed.
 
-# In[67]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[68]:
+# In[ ]:
 
 
 if not LOAD_DATA_FROM_CSV:
@@ -689,7 +689,7 @@ if not LOAD_DATA_FROM_CSV:
         plt.show()
 
 
-# In[69]:
+# In[ ]:
 
 
 if ZSCORE_NORMALIZATION:
@@ -700,7 +700,7 @@ if ZSCORE_NORMALIZATION:
 
 # ### Visualizing input data and labels
 
-# In[70]:
+# In[ ]:
 
 
 x_train
@@ -713,7 +713,7 @@ y_test
 
 # Checking if our output is always positive ~~by plotting a histogram of y_train and y_test tensors~~
 
-# In[71]:
+# In[ ]:
 
 
 import torch
@@ -730,7 +730,7 @@ any_negative = torch.any(tensor < 0)
 print(any_negative)
 
 
-# In[72]:
+# In[ ]:
 
 
 y_train.shape
@@ -746,7 +746,7 @@ any_negative = torch.any(x_train < 0)
 any_negative
 
 
-# In[73]:
+# In[ ]:
 
 
 #%%script echo skipping
@@ -772,7 +772,7 @@ plt.tight_layout()
 plt.show()
 
 
-# In[74]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -780,7 +780,7 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 # ## Defining the neural network
 
-# In[75]:
+# In[ ]:
 
 
 # Defining a class for the network
@@ -854,13 +854,13 @@ class Net(nn.Module):
         return x # Returning the output tensor
 
 
-# In[76]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n[1,2,3]\n[1,2,3][:-1]\n')
 
 
-# In[77]:
+# In[ ]:
 
 
 for x in [1,2,3][:-1]:
@@ -870,7 +870,7 @@ for x in [1,2,3][:-1]:
 
 # ## Defining the model and search space
 
-# In[78]:
+# In[ ]:
 
 
 # Defining a function to create a trial network and optimizer
@@ -1104,7 +1104,7 @@ def create_model(trial, optimize):
 # 
 #  We first define a couple of functions used in the training and evaluation.
 
-# In[79]:
+# In[ ]:
 
 
 # Defining a function that computes loss and metrics for a given batch
@@ -1164,7 +1164,7 @@ def update_scheduler(scheduler, test_loss):
 
 # Now for the actual training and evaluation loop,
 
-# In[80]:
+# In[ ]:
 
 
 # Defining a function to train and evaluate a network
@@ -1323,7 +1323,7 @@ def train_and_eval(net, loss_fn, optimizer, batch_size, n_epochs, scheduler, tra
 
 # ## The objective function and hyperparameter tuning
 
-# In[81]:
+# In[ ]:
 
 
 # Defining an objective function for Optuna to minimize
@@ -1369,14 +1369,28 @@ def objective(trial):
     return val_metrics[-1]["l1_norm"]
 
 
-# In[83]:
+# In[ ]:
 
 
 # Visualize Optuna study while its running, alternative to tensorboard
-from IPython import display
+# from IPython import display
+# def callback(study, trial):
+#     display.clear_output(wait=True)
+#     optuna.visualization.plot_optimization_history(study).show()
+
 def callback(study, trial):
-    display.clear_output(wait=True)
-    optuna.visualization.plot_optimization_history(study).show()
+    # This function is called after each trial.
+    # `trial` is the completed trial.
+    with open('all_trials.json', 'a') as f:
+        # Save the trial number, value, and parameters to a JSON file.
+        json.dump({
+            'number': trial.number,
+            'value': trial.value,
+            'params': trial.params
+        }, f)
+        # Write a newline character after each trial, so that each trial is on a separate line
+        f.write('\n')
+
 
 if OPTIMIZE:
     # Include the path to the SQLite file in your create_study call.
@@ -1385,15 +1399,14 @@ if OPTIMIZE:
                                 pruner=optuna.pruners.MedianPruner(), 
                                 storage=f'sqlite:///{STUDY_NAME}.db')
 
-    #study.optimize(objective, n_trials=N_TRIALS, callbacks=[callback])
-    study.optimize(objective, n_trials=N_TRIALS)
+    study.optimize(objective, n_trials=N_TRIALS, callbacks=[callback])
+    #study.optimize(objective, n_trials=N_TRIALS)
 
 
-# In[85]:
+# In[ ]:
 
 
 if OPTIMIZE:
-# TODO: Plotting currently fails. Once resolved, use the callback version of the study too.
 #    # Optimization History
 #    ov.plot_optimization_history(study).show()
 #
@@ -1432,7 +1445,7 @@ if OPTIMIZE:
 
 # ## Training the model
 
-# In[86]:
+# In[ ]:
 
 
 # Creating the best network and optimizer using the best hyperparameters
@@ -1472,7 +1485,7 @@ else:
     dropout_rate = create_model(trial=None, optimize=True)
 
 
-# In[87]:
+# In[ ]:
 
 
 print("loss_fn:", net)
@@ -1493,7 +1506,7 @@ print("dropout_rate", dropout_rate)
 
 # After optimizing with Optuna and deciding on the best hyperparameters, we combine the training and validatin set, using that as the new training set for training the model, and then evaluate the model on the test set
 
-# In[88]:
+# In[ ]:
 
 
 x_train_val = torch.cat((x_train, x_val), 0)
@@ -1513,7 +1526,7 @@ train_losses, _, test_losses, train_metrics, _, test_metrics, = train_and_eval(
 
 # ## Saving
 
-# In[89]:
+# In[ ]:
 
 
 import json
@@ -1584,13 +1597,13 @@ train_df.to_csv("train_output.csv", index=False)
 save_file("train_output.csv")
 
 
-# In[90]:
+# In[ ]:
 
 
 [key for key in var_dict.keys()]
 
 
-# In[91]:
+# In[ ]:
 
 
 #%%script echo skipping
@@ -1601,7 +1614,7 @@ output_activation_name
 
 # ## Visualizing the results
 
-# In[93]:
+# In[ ]:
 
 
 # First figure: Train and Test L1 Norm
@@ -1655,7 +1668,7 @@ plt.savefig("NNGRX_MSE_plot.png")
 
 # ## Loading
 
-# In[95]:
+# In[ ]:
 
 
 # load the dictionary from the .json file
@@ -1857,7 +1870,7 @@ if STUDY_NAME is not None:
     # study_loaded_db
 
 
-# In[99]:
+# In[ ]:
 
 
 if STUDY_NAME is not None:
@@ -1865,20 +1878,20 @@ if STUDY_NAME is not None:
     study_loaded_pkl.best_params
 
 
-# In[100]:
+# In[ ]:
 
 
 if STUDY_NAME is not None:
     best_trial_params_loaded
 
 
-# In[101]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\nscheduler_loaded_state_dict["mode"]\nscheduler_loaded_state_dict["factor"]\nscheduler_loaded_state_dict["patience"]\nscheduler_loaded_state_dict["threshold"]\nscheduler_loaded_state_dict["min_lrs"]\n\n\nscheduler_loaded_state_dict["base_lr"]\nscheduler_loaded_state_dict["max_lr"]\nscheduler_loaded_state_dict["step_size_up"]\n')
 
 
-# In[102]:
+# In[ ]:
 
 
 # %%script echo skipping
@@ -1887,7 +1900,7 @@ var_dict
 hidden_activation_name_loaded
 
 
-# In[103]:
+# In[ ]:
 
 
 # %%script echo skipping
@@ -1926,7 +1939,7 @@ train_metrics_loaded
 test_metrics_loaded
 
 
-# In[104]:
+# In[ ]:
 
 
 train_losses_loaded[-1]
@@ -1941,13 +1954,13 @@ test_metrics_loaded[-1]['linf_norm']
 
 # Let us verify correct loading of the train and test metrics by visualizing them again but now through the loaded values. Likewise for the train and test losses.
 
-# In[105]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "last_expr_or_assign"')
 
 
-# In[106]:
+# In[ ]:
 
 
 # Plotting the losses and metrics for the best network plt.figure(figsize=(12, 
@@ -1996,7 +2009,7 @@ plt.legend()
 plt.show()
 
 
-# In[107]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
@@ -2004,7 +2017,7 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 
 # ## Counting the number of parameters in the network.
 
-# In[108]:
+# In[ ]:
 
 
 net_loaded.eval()
@@ -2018,7 +2031,7 @@ print(f'The model has {count_parameters(net_loaded)} parameters.')
 # 
 # We compare `net` and `net_loaded` to confirm correct loading of the network. Note that `net` is only available if we have trained the model in this session.
 
-# In[109]:
+# In[ ]:
 
 
 #%%script echo skipping
@@ -2027,14 +2040,14 @@ print(f'The model has {count_parameters(net_loaded)} parameters.')
 net.eval()
 
 
-# In[110]:
+# In[ ]:
 
 
 # Set the network to evaluation mode
 net_loaded.eval
 
 
-# In[111]:
+# In[ ]:
 
 
 for p1, p2 in zip(net.parameters(), net_loaded.parameters()):
@@ -2048,7 +2061,7 @@ print("Net device:", next(net.parameters()).device)
 print("Net_loaded device:", next(net_loaded.parameters()).device)
 
 
-# In[112]:
+# In[ ]:
 
 
 #%%script echo skipping
@@ -2056,13 +2069,13 @@ print("Net_loaded device:", next(net_loaded.parameters()).device)
 print(list(net.parameters()))
 
 
-# In[113]:
+# In[ ]:
 
 
 print(list(net_loaded.parameters()))
 
 
-# In[114]:
+# In[ ]:
 
 
 rho_example, epsilon_example, vx_example, vy_example, vz_example, Bx_example, By_example, Bz_example, gxx_example, gxy_example, gxz_example, gyy_example, gyz_example, gzz_example = generate_samples(20)
@@ -2071,7 +2084,7 @@ inputs =  generate_input_data(rho_example, epsilon_example, vx_example, vy_examp
 inputs
 
 
-# In[115]:
+# In[ ]:
 
 
 #%%script echo skipping
@@ -2082,7 +2095,7 @@ outputs = [net(input.unsqueeze(0)) for input in inputs]
 outputs
 
 
-# In[116]:
+# In[ ]:
 
 
 # Pass the inputs to the network and get the outputs
@@ -2093,7 +2106,7 @@ outputs
 
 # ## Porting the model to C++
 
-# In[117]:
+# In[ ]:
 
 
 import torch.jit

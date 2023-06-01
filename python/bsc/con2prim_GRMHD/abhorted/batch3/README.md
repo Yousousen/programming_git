@@ -1,0 +1,1 @@
+One actually completed; which I surmise is the reason for the abhortion for all the others. I will now run everything with high number of trials so that it can continue on hopeully without problems.
