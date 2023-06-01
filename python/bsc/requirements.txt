@@ -13,3 +13,4 @@ plotly
 tensorboard
 tensorboardX
 torch-tb-profiler
+scikit-learn

@@ -1373,14 +1373,10 @@ def objective(trial):
 
 
 # Visualize Optuna study while its running, alternative to tensorboard
-# from IPython import display
-# def callback(study, trial):
-#     display.clear_output(wait=True)
-#     optuna.visualization.plot_optimization_history(study).show()
+#from IPython import display
+import optuna.visualization as ov
 
 def callback(study, trial):
-    # This function is called after each trial.
-    # `trial` is the completed trial.
     with open('all_trials.json', 'a') as f:
         # Save the trial number, value, and parameters to a JSON file.
         json.dump({
@@ -1390,8 +1386,33 @@ def callback(study, trial):
         }, f)
         # Write a newline character after each trial, so that each trial is on a separate line
         f.write('\n')
+        save_file('all_trials.json')
 
+    # Visualize the optimization history, and save it as an HTML file.
+    fig1 = ov.plot_optimization_history(study)
+    fig1.write_html(f"optimization_history_{STUDY_NAME}.html")
+    save_file(f"optimization_history_{STUDY_NAME}.html")
+    fig1.show()
 
+    # Do the same for the other visualizations.
+    fig2 = ov.plot_slice(study)
+    fig2.write_html(f"slice_plot_{STUDY_NAME}.html")
+    save_file(f"slice_plot_{STUDY_NAME}.html")
+
+    # fig3 = ov.plot_contour(study)
+    # fig3.write_html(f"contour_plot_{STUDY_NAME}.html")
+    # save_file(f"contour_plot_{STUDY_NAME}.html")
+
+    # fig4 = ov.plot_parallel_coordinate(study)
+    # fig4.write_html(f"parallel_coordinate_plot_{STUDY_NAME}.html")
+    # save_file(f"parallel_coordinate_plot_{STUDY_NAME}.html")
+
+    # if trial.number > 1: # Required
+    #   fig5 = ov.plot_param_importances(study)
+    #   fig5.write_html(f"param_importances_plot_{STUDY_NAME}.html")
+    #   save_file(f"param_importances_plot_{STUDY_NAME}.html")
+
+        
 if OPTIMIZE:
     # Include the path to the SQLite file in your create_study call.
     study = optuna.create_study(direction="minimize", 
@@ -1963,50 +1984,53 @@ get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity 
 # In[ ]:
 
 
-# Plotting the losses and metrics for the best network plt.figure(figsize=(12, 
-#plt.subplot(2, 2, 1)
-#plt.plot(train_losses_loaded, label="Train Loss")
-#plt.plot(test_losses_loaded, label="Test Loss")
-#plt.xlabel("Epoch")
-#plt.ylabel("Loss")
-#plt.legend()
-plt.subplot(2, 2, 2)
-plt.plot([m["l1_norm"] for m in train_metrics_loaded], label="Train L1 Norm")
-plt.plot([m["l1_norm"] for m in test_metrics_loaded], label="Test L1 Norm")
+# First figure: Train and Test L1 Norm
+plt.figure(figsize=(6, 4))
+plt.plot([m["l1_norm"] for m in train_metrics_loaded], label="Train L1 Norm", color='blue')
+plt.plot([m["l1_norm"] for m in test_metrics_loaded], label="Test L1 Norm", color='red')
 plt.xlabel("Epoch")
 plt.ylabel("L1 Norm")
-# Added setting the vertical axis to be in powers of 10
+plt.title("NNGRX Train and Test L1 Norm per Epoch")
 plt.yscale("log")
-# Added setting the vertical axis limits to be from 10^-7 to 10^0
-plt.ylim(1e-3, 1e2)
-plt.legend()
-plt.subplot(2, 2, 3)
-plt.plot([m["linf_norm"] for m in train_metrics_loaded], label="Train Linf Norm")
-plt.plot([m["linf_norm"] for m in test_metrics_loaded], label="Test Linf Norm")
-plt.xlabel("Epoch")
-plt.ylabel("Linf Norm")
-# Added setting the vertical axis to be in powers of 10
-plt.yscale("log")
-# Added setting the vertical axis limits to be from 10^-7 to 10^0
+plt.grid(True)
+plt.xlim(right=200)
 plt.ylim(1e-3, 1e2)
 plt.legend()
 plt.tight_layout()
-plt.show()
+# plt.savefig("NNGRX_L1_norm_plot.png", dpi=300)
+plt.savefig("NNGRX_L1_norm_plot.png")
 
-# Added plotting MSE of training data and MSE of test data in one plot 
-plt.figure(figsize=(8, 6))
-plt.plot(train_losses_loaded,label="training data")
-plt.plot(test_losses_loaded,label="test data")
-#if scheduler is not None:
-#    plt.plot([scheduler.get_last_lr()[0] for _ in range(n_epochs)], label="Learning rate") 
+# Second figure: Train and Test Linf Norm
+plt.figure(figsize=(6, 4))
+plt.plot([m["linf_norm"] for m in train_metrics_loaded], label="Train Linf Norm", color='blue')
+plt.plot([m["linf_norm"] for m in test_metrics_loaded], label="Test Linf Norm", color='red')
 plt.xlabel("Epoch")
-plt.ylabel(f"{loss_name_loaded} Loss")
-# Added setting the vertical axis to be in powers of 10
+plt.ylabel("Linf Norm")
+plt.title("NNGRX Train and Test Linf Norm per Epoch")
 plt.yscale("log")
-# Added setting the vertical axis limits to be from 10^-7 to 10^0
+plt.grid(True)
+plt.xlim(right=200)
+plt.ylim(1e-3, 1e2)
+plt.legend()
+plt.tight_layout()
+# plt.savefig("NNGRX_Linf_norm_plot.png", dpi=300)
+plt.savefig("NNGRX_Linf_norm_plot.png")
+
+# Third figure: MSE of training data and test data
+plt.figure(figsize=(6, 4))
+plt.plot(train_losses_loaded, label="Training Data", color='blue')
+plt.plot(test_losses_loaded, label="Test Data", color='red')
+plt.xlabel("Epoch")
+plt.ylabel("MSE")
+plt.title("NNGRX MSE of Training and Test Data per Epoch")
+plt.yscale("log")
+plt.grid(True)
+plt.xlim(right=200)
 plt.ylim(1e-7, 1e0)
 plt.legend()
-plt.show()
+plt.tight_layout()
+# plt.savefig("NNGRX_MSE_plot.png", dpi=300)
+plt.savefig("NNGRX_MSE_plot.png")
 
 
 # In[ ]:
