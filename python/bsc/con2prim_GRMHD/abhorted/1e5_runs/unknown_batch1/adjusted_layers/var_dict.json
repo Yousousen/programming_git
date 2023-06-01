@@ -1,0 +1,1 @@
+{"batch_size": 2048, "n_epochs": 61, "loss_name": "MSE", "optimizer_name": "Adagrad", "scheduler_name": "StepLR", "n_units": [1977, 1249, 2128, 458, 225], "n_layers": 5, "hidden_activation_name": "PReLU", "output_activation_name": "Identity", "lr": 1.488763354818719e-05, "dropout_rate": 0.04066292234443236, "prelu_init": 0.17275089025497437}
