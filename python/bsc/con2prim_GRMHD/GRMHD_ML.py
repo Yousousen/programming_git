@@ -904,7 +904,7 @@ def create_model(trial, optimize):
     """
     # If optimize is True, sample the hyperparameters from the search space
     if OPTIMIZE:
-        n_layers = trial.suggest_int("n_layers", 2, 10)
+        n_layers = trial.suggest_int("n_layers", 1, 10)
         n_units = [trial.suggest_int(f"n_units_{i}", 16, 4096) for i in range(n_layers)]
 
         hidden_activation_name = trial.suggest_categorical(
