@@ -121,12 +121,12 @@ import pandas as pd
 # Checking if GPU is available and setting the device accordingly
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-N_TRIALS = 5 # Number of trials for hyperparameter optimization # NOTE: Set this properly.
-OPTIMIZE = True # Whether to optimize the hyperparameters or to use predetermined values. # NOTE: Set this properly.
+N_TRIALS = 250 # Number of trials for hyperparameter optimization # NOTE: Set this properly.
+OPTIMIZE = False # Whether to optimize the hyperparameters or to use predetermined values. # NOTE: Set this properly.
 ZSCORE_NORMALIZATION = False # Whether to z-score normalize the input data.
 LOAD_DATA_FROM_CSV = False  # If not true we generate the data in this file and save to {x_train,y_train,x_test,y_test}.csv, otherwise we load the data from files of the same name. # NOTE: Set this before properly.
 #STUDY_NAME = None
-STUDY_NAME = "TestStudy" # NOTE: Set this before properly
+STUDY_NAME = "Test05-06-23" # NOTE: Set this before properly
 
 csv_filenames = { # File names to load input data and labels from if LOAD_DATA_FROM_CSV is True.
     "x_train": "x_train.csv",
@@ -151,6 +151,14 @@ N_EPOCHS_NO_OPT = 2 # NOTE: Set this properly.
 SCHEDULER_NAME_NO_OPT = "ReduceLROnPlateau"
 DROPOUT_RATE_NO_OPT = 0.2
 
+# Subparameters
+WEIGHT_DECAY_NO_OPT = 0.0008705866531443986
+BETA1_NO_OPT = 0.9948486404725556
+BETA2_NO_OPT = 0.9990123775599838
+STEP_SIZE_NO_OPT = 5
+GAMMA_NO_OPT = 0.10899783210727848
+
+
 N_INPUTS = 14  # Number of input features.
 N_OUTPUTS = 1  # Number of outputs.
 Gamma = 5/3  # Adiabatic index
@@ -174,7 +182,7 @@ gyy_interval = (0.9, 1.1)
 gyz_interval = (0, 0.1)
 gzz_interval = (0.9, 1.1)
 
-np.random.seed(70) # Comment for true random data.
+np.random.seed(200) # Comment for true random data.
 
 
 # ## Input data and labels
@@ -904,7 +912,7 @@ def create_model(trial, optimize):
     """
     # If optimize is True, sample the hyperparameters from the search space
     if OPTIMIZE:
-        n_layers = trial.suggest_int("n_layers", 1, 10)
+        n_layers = trial.suggest_int("n_layers", 1, 5)
         n_units = [trial.suggest_int(f"n_units_{i}", 16, 4096) for i in range(n_layers)]
 
         hidden_activation_name = trial.suggest_categorical(
@@ -912,13 +920,13 @@ def create_model(trial, optimize):
         )
         output_activation_name = trial.suggest_categorical( "output_activation", ["Linear"])
 
-        loss_name = trial.suggest_categorical( "loss", ["MSE", "MAE", "Huber", "Quantile"]) 
+        loss_name = trial.suggest_categorical( "loss", ["MSE", "MAE", "Huber"]) 
 
         optimizer_name = trial.suggest_categorical( "optimizer", ["Adam", "SGD", "RMSprop", "Adagrad"] )
 
-        lr = trial.suggest_loguniform("lr", 1e-5, 1e-1)
+        lr = trial.suggest_loguniform("lr", 1e-4, 1e-2)
 
-        batch_size_list = [32, 64, 128, 256, 512, 1024, 2048]
+        batch_size_list = [32, 64, 128, 256, 512]
         batch_size = trial.suggest_categorical("batch_size", batch_size_list)
         
         n_epochs = trial.suggest_int("n_epochs", 50, 150)
@@ -1068,7 +1076,7 @@ def create_model(trial, optimize):
         if optimizer_name == "SGD":
             optimizer = optim.SGD(net.parameters(), lr=lr)
         elif optimizer_name == "Adam":
-            optimizer = optim.Adam(net.parameters(), lr=lr)
+            optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=WEIGHT_DECAY_NO_OPT, betas=(BETA1_NO_OPT, BETA2_NO_OPT))
         elif optimizer_name == "RMSprop":
             optimizer = optim.RMSprop(net.parameters(), lr=lr)
         else:
@@ -1076,7 +1084,7 @@ def create_model(trial, optimize):
 
         # Creating the learning rate scheduler from its name
         if scheduler_name == "StepLR":
-            scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+            scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=STEP_SIZE_NO_OPT, gamma=GAMMA_NO_OPT)
         elif scheduler_name == "ExponentialLR":
             scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9)
         elif scheduler_name == "CosineAnnealingLR":
@@ -1094,10 +1102,9 @@ def create_model(trial, optimize):
         else:
             scheduler = None
 
+
     # Returning all variables needed for saving and loading
     return net, loss_fn, optimizer, batch_size, n_epochs, scheduler, loss_name, optimizer_name, scheduler_name, n_units, n_layers, hidden_activation, output_activation, lr, dropout_rate
-
-
 
 
 #  ## The training and evaluation loop
@@ -1864,7 +1871,7 @@ test_metrics_loaded = [
     for i in range(len(train_df_loaded))
 ]
 
-if STUDY_NAME is not None:
+if OPTIMIZE:
   # Loading the study from the SQLite file
   # TODO: Fix this one, or we just use pickle
   # study_loaded_db = optuna.load_study(study_name=f'{STUDY_NAME}', 
@@ -1900,7 +1907,7 @@ var_dict_loaded["dropout_rate"]
 # In[ ]:
 
 
-if STUDY_NAME is not None:
+if OPTIMIZE:
     pass
     # study_loaded_db
 
@@ -1908,7 +1915,7 @@ if STUDY_NAME is not None:
 # In[ ]:
 
 
-if STUDY_NAME is not None:
+if OPTIMIZE:
     study_loaded_pkl
     study_loaded_pkl.best_params
 
@@ -1916,7 +1923,7 @@ if STUDY_NAME is not None:
 # In[ ]:
 
 
-if STUDY_NAME is not None:
+if OPTIMIZE:
     best_trial_params_loaded
 
 
