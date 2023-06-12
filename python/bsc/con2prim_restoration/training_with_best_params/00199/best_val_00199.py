@@ -16,13 +16,13 @@
 # In[2]:
 
 
-get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
+get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')")
 
 
 # In[3]:
 
 
-get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX\n')
+get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX')
 
 
 # In[4]:
@@ -48,6 +48,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # NOTE: Some subparameters still need to be adjusted in the `create_model` function itself as of (Tue May 16 07:42:45 AM CEST 2023).
 
 # In[5]:
+
 
 
 N_TRIALS = 250 # Number of trials for hyperparameter optimization
@@ -91,6 +92,7 @@ np.random.seed(2) # Uncomment for pseudorandom data.
 # ## Generating the data
 
 # In[6]:
+
 
 
 # Defining an analytic equation of state (EOS) for an ideal gas
@@ -236,8 +238,8 @@ plt.tight_layout()
 plt.show()
 
 
-
 # In[35]:
+
 
 
 # Generating the input and output data for train and test sets.
@@ -296,6 +298,7 @@ if ZSCORE_NORMALIZATION:
 
 
 # In[38]:
+
 
 
 # Verifying that the means and the stds of the input data are close to 0 and 1 respectively.
@@ -627,7 +630,6 @@ def create_model(trial, optimize):
     return net, loss_fn, optimizer, batch_size, n_epochs, scheduler, loss_name, optimizer_name, scheduler_name, n_units, n_layers, hidden_activation, output_activation, lr
 
 
-
 #  ## The training and evaluation loop
 # 
 #  We first define a couple of functions used in the training and evaluation.
@@ -874,20 +876,7 @@ def objective(trial):
         float: The validation L1 norm to minimize.
     """
     # Creating a trial network and optimizer using the create_model function
-    net, \
-    loss_fn, \
-    optimizer, \
-    batch_size, \
-    n_epochs, \
-    scheduler, \
-    loss_name, \
-    optimizer_name, \
-    scheduler_name, \
-    n_units, \
-    n_layers, \
-    hidden_activation, \
-    output_activation, \
-    lr = create_model(trial, optimize=True)
+    net,     loss_fn,     optimizer,     batch_size,     n_epochs,     scheduler,     loss_name,     optimizer_name,     scheduler_name,     n_units,     n_layers,     hidden_activation,     output_activation,     lr = create_model(trial, optimize=True)
 
     # Training and evaluating the network using the train_and_eval function
     _, _, _, test_metrics = train_and_eval(
@@ -924,36 +913,10 @@ if OPTIMIZE:
 
 # Creating the best network and optimizer using the best hyperparameters
 if OPTIMIZE:
-    net, \
-    loss_fn, \
-    optimizer, \
-    batch_size, \
-    n_epochs, \
-    scheduler, \
-    loss_name, \
-    optimizer_name, \
-    scheduler_name, \
-    n_units, \
-    n_layers, \
-    hidden_activation, \
-    output_activation, \
-    lr = create_model(trial, optimize=True)
+    net,     loss_fn,     optimizer,     batch_size,     n_epochs,     scheduler,     loss_name,     optimizer_name,     scheduler_name,     n_units,     n_layers,     hidden_activation,     output_activation,     lr = create_model(trial, optimize=True)
 # Creating the network with predefined hyperparameters
 else:
-    net, \
-    loss_fn, \
-    optimizer, \
-    batch_size, \
-    n_epochs, \
-    scheduler, \
-    loss_name, \
-    optimizer_name, \
-    scheduler_name, \
-    n_units, \
-    n_layers, \
-    hidden_activation, \
-    output_activation, \
-    lr = create_model(trial=None, optimize=False)
+    net,     loss_fn,     optimizer,     batch_size,     n_epochs,     scheduler,     loss_name,     optimizer_name,     scheduler_name,     n_units,     n_layers,     hidden_activation,     output_activation,     lr = create_model(trial=None, optimize=False)
 
 
 # In[48]:
@@ -1008,6 +971,7 @@ def save_file(file_name):
 
 
 # In[51]:
+
 
 
 # save the network to a .pth file
@@ -1413,6 +1377,7 @@ net_loaded.eval()
 
 
 # In[64]:
+
 
 
 # Pass the inputs to the network and get the outputs

@@ -8,13 +8,13 @@
 
 # Next some cells for working on google colab,
 
-# In[2]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', "\nfrom google.colab import drive\ndrive.mount('/content/drive')\n")
 
 
-# In[3]:
+# In[ ]:
 
 
 get_ipython().run_cell_magic('script', 'echo skipping', '\n!pip install optuna tensorboard tensorboardX\n')
@@ -1368,6 +1368,20 @@ plt.savefig("NNSR2_MSE_plot.png", dpi=300)
 
 
 get_ipython().run_line_magic('config', 'InteractiveShell.ast_node_interactivity = "all"')
+
+
+# In[1]:
+
+
+import pandas as pd
+
+def save_metrics_to_csv(metrics_data, filename):
+    df = pd.DataFrame(metrics_data)
+    df.columns = ['L1 Norm', 'Linf Norm']
+    df.to_csv(filename, index=False)
+
+save_metrics_to_csv(train_metrics_loaded, 'train_metrics_NNSR1.csv')
+save_metrics_to_csv(test_metrics_loaded, 'test_metrics_NNSR1.csv')
 
 
 # ## Evaluating the network on arbirary input
